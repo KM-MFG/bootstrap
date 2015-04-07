@@ -1,0 +1,11 @@
+<%@ Page Language="C#" CodeFile="customer_history.aspx.cs" Inherits="AspDotNetStorefrontAdmin.customer_history" MaintainScrollPositionOnPostback="true" MasterPageFile="~/App_Templates/Admin_Default/AdminMaster.master" %>
+
+<asp:Content runat="server" ContentPlaceHolderID="bodyContentPlaceholder">
+	<h1>
+		<i class="fa fa-user"></i>
+		<asp:Literal ID="customerHistoryTitle" runat="server" Text="<%$ Tokens:StringResource, admin.title.cst_history %>" />
+	</h1>
+	<div class="white-ui-box customer-history">
+		<asp:Literal ID="ltContent" runat="server" />
+	</div>
+</asp:Content>

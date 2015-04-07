@@ -1,0 +1,61 @@
+﻿<%@ Master Language="C#" AutoEventWireup="true" Inherits="AspDotNetStorefront.MasterPageBase" %>
+
+<%@ Register TagPrefix="aspdnsf" TagName="Topic" Src="~/Controls/TopicControl.ascx" %>
+<%@ Register TagPrefix="aspdnsf" TagName="XmlPackage" Src="~/Controls/XmlPackageControl.ascx" %>
+<%@ Register TagPrefix="custom" TagName="Search" Src="~/Controls/Search.ascx" %>
+<%@ Import Namespace="AspDotNetStorefrontCore" %>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head id="Head1" runat="server">
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+	<%-- Leave the title empty, it will get populated at runtime --%>
+	<title></title>
+	<%-- Leave the description and keyword content empty, it will get populated at runtime --%>
+	<meta name="description" content="" />
+	<meta name="keywords" content="" />
+	<%-- The skin ref will base on the current theme applied so we don't need to declare here which css file to use --%>
+
+	<%-- jQuery is required in versions 9.4 and higher --%>
+	<script src="jscripts/jquery.min.js" type="text/javascript"></script>
+	<script type="text/javascript">
+		adnsf$ = jQuery; <%-- to avoid conflicts with existing jQuery versions and other javascript frameworks, change this line to adnsf$ = jQuery.noConflict(); --%>
+	</script>
+
+	<%--This xmlpackage can be used to add dynamic data to javascripts such as tracking scripts that should run before the closing head tag--%>
+	<aspdnsf:XmlPackage runat="server" PackageName="script.headclose" />
+</head>
+<body>
+	<asp:Literal ID="ltrPageInfo" runat="server" Text='<%$ Tokens:PageInfo %>' />
+
+	<%--This xmlpackage can be used to add dynamic data to javascripts such as tracking scripts that should run just after the opening body tag--%>
+	<aspdnsf:XmlPackage runat="server" PackageName="script.bodyopen" />
+
+	<form id="form1" runat="server">
+		<%-- Only render for pages that require ajax --%>
+		<%  if(RequireScriptManager)
+	  { %>
+		<ajaxToolkit:ToolkitScriptManager runat="server" ID="scrptMgr" CombineScripts="true" />
+		<% } %>
+		<div class="container">
+			<div class="body-wrapper">
+				<p style="background-color: #FFFF00; padding: 4px;">
+					<span style="font-size: 12px; color: red; font-weight: bold;">**** You Are Acting For Customer: 
+				    <asp:Literal ID="Literal2" runat="server" Text='<%$ Tokens:User_Menu_Name %>' />
+						, ID=
+				    <asp:Literal ID="Literal3" runat="server" Text='<%$ Tokens:CustomerID %>' />
+						****&nbsp;&nbsp;
+				    <a href="default.aspx?IGD=">End Session</a>
+					</span>
+				</p>
+			</div>
+		</div>
+		<asp:ContentPlaceHolder ID="PageContent" runat="server">
+		</asp:ContentPlaceHolder>
+		<!-- CONTENTS END -->
+
+		<%--temporary solution for rendering the form validation--%>
+		<asp:Button ID="Button1" runat="server" Text="Button"
+			UseSubmitBehavior="False" Style="visibility: hidden" />
+	</form>
+</body>
+</html>
