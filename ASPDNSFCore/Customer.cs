@@ -109,7 +109,7 @@ namespace AspDotNetStorefrontCore
             }
         }
 
-        private int m_FailedTransactionCount;
+        private int m_FailedTransactionCount = -1;
         #endregion
 
         /// <summary>
@@ -1607,9 +1607,6 @@ namespace AspDotNetStorefrontCore
                 StoreName = DB.RSField(rs, "StoreName");
                 m_LastIPAddress = DB.RSField(rs, "LastIPAddress");
 
-                //Find Failed Transactions
-				m_FailedTransactionCount = DB.GetSqlN(String.Format("[dbo].[aspdnsf_getFailedTransactionCount] {0}", m_CustomerID));
-
                 //Get Roles
                 if (IsRegistered)
                 {
@@ -1721,9 +1718,13 @@ namespace AspDotNetStorefrontCore
                     return;
 
             String DefaultCurrency = AppLogic.GetLocaleDefaultCurrency(this.LocaleSetting);
-
-            this.UpdateCustomer(new SqlParameter[] { new SqlParameter("CurrencySetting", DefaultCurrency) });
-            m_CurrencySetting = DefaultCurrency;
+			
+			//Only hit the DB when it makes sense to
+			if (!String.IsNullOrEmpty(DefaultCurrency) && DefaultCurrency != CurrentCurrency)
+			{
+				this.UpdateCustomer(new SqlParameter[] { new SqlParameter("CurrencySetting", DefaultCurrency) });
+				m_CurrencySetting = DefaultCurrency;
+			}
         }
 
         private void SetDefaultCustomerLevelData()
@@ -2717,6 +2718,22 @@ namespace AspDotNetStorefrontCore
             ClearAllCustomerProfile();
         }
 
+		public void EndAnonymousSession()
+		{
+			//Nuke all the cookies
+			for(int i = 0; i < HttpContext.Current.Request.Cookies.Count; i++)
+			{
+				String cookie = HttpContext.Current.Request.Cookies.Keys[i];
+				HttpContext.Current.Response.Cookies[cookie].Expires = System.DateTime.Now.AddDays(-1);
+			}
+
+			//Clear CustomerSession table
+			ThisCustomerSession.Clear();
+
+			//Nuke Profile records
+			DB.ExecuteSQL(String.Format("DELETE FROM Profile WHERE CustomerID = {0}", CustomerID));
+		}
+
         /// <summary>
         /// Removes all cookies created by the store
         /// </summary>
@@ -2932,7 +2949,7 @@ namespace AspDotNetStorefrontCore
             }
             set
             {
-                if (m_HasCustomerRecord)
+                if (m_HasCustomerRecord && m_VATSetting != value)
                 {
                     SqlParameter sp1 = DB.CreateSQLParameter("@VATSetting", SqlDbType.Int, 4, value, ParameterDirection.Input);
                     SqlParameter[] spa = { sp1 };
@@ -3207,7 +3224,7 @@ namespace AspDotNetStorefrontCore
             }
             set
             {
-                if (m_HasCustomerRecord)
+                if (m_HasCustomerRecord && m_AffiliateID != value)
                 {
                     SqlParameter sp1 = DB.CreateSQLParameter("@AffiliateID", SqlDbType.Int, 4, value, ParameterDirection.Input);
                     SqlParameter[] spa = { sp1 };
@@ -3544,9 +3561,9 @@ namespace AspDotNetStorefrontCore
             }
             set
             {
-                if (value != "" && value != null)
+				if(value != "" && value != null && value != m_LocaleSetting)
                 {
-                    if (m_HasCustomerRecord)
+					if(m_HasCustomerRecord)
                     {
                         SqlParameter sp1 = DB.CreateSQLParameter("@LocaleSetting", SqlDbType.NVarChar, 10, value, ParameterDirection.Input);
                         SqlParameter[] spa = { sp1 };
@@ -3621,11 +3638,10 @@ namespace AspDotNetStorefrontCore
             }
             set
             {
-                if (value != "" && value != null)
+                if (value != "" && value != null && value != m_CurrencySetting)
                 {
                     if (m_HasCustomerRecord)
                     {
-
                         SqlParameter sp1 = DB.CreateSQLParameter("@CurrencySetting", SqlDbType.NVarChar, 10, value, ParameterDirection.Input);
                         SqlParameter[] spa = { sp1 };
                         string retval = this.UpdateCustomer(spa);
@@ -3937,7 +3953,14 @@ namespace AspDotNetStorefrontCore
         /// </summary>
         public int FailedTransactionCount
         {
-            get { return m_FailedTransactionCount; }
+			get
+			{
+				if (m_FailedTransactionCount == -1)
+				{
+					m_FailedTransactionCount = DB.GetSqlN(String.Format("[dbo].[aspdnsf_getFailedTransactionCount] {0}", m_CustomerID));
+				}
+				return m_FailedTransactionCount;
+			}
         }
 
         #endregion

@@ -123,6 +123,7 @@
     <Compile Include="Listing\CommandCheckBoxField.cs" />
     <Compile Include="Listing\TooltipHyperLinkField.cs" />
     <Compile Include="Listing\TypeTypeConverter.cs" />
+    <Compile Include="LocaleSelector.cs" />
     <Compile Include="NamingContainerPanel.cs" />
     <Compile Include="ReturnUrlTracker.cs" />
     <Compile Include="Token.cs" />

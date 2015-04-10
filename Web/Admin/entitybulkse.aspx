@@ -1,6 +1,8 @@
 <%@ Page Language="c#" Inherits="AspDotNetStorefrontAdmin.entityBulkSE" CodeFile="entitybulkse.aspx.cs" %>
 
+<html>
 <head runat="server">
+	<title>Entity Bulk SE</title>
 	<script src="Scripts/jquery.min.js" type="text/javascript"></script>
 	<script src="Scripts/bootstrap.min.js" type="text/javascript"></script>
 </head>
@@ -13,8 +15,9 @@
 			</div>
 			<asp:Literal ID="ltBody" runat="server" />
 			<div class="item-action-bar">
-				<asp:Button runat="server" ID="btnSubmitBottom" CssClass="btn btn-primary btn-sm" Text="<%$Tokens:StringResource, admin.entityBulkSE.SearchEngineUpdate %>" />
+				<asp:Button runat="server" CssClass="btn btn-primary btn-sm" Text="<%$Tokens:StringResource, admin.entityBulkSE.SearchEngineUpdate %>" />
 			</div>
 		</asp:Panel>
 	</form>
 </body>
+</html>

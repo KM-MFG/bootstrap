@@ -285,7 +285,7 @@ namespace AspDotNetStorefrontAdmin
 							using(SqlConnection dbconn = new SqlConnection(DB.GetDBConn()))
 							{
 								dbconn.Open();
-								using(IDataReader rs2 = DB.GetRS("select * from Orders  with (NOLOCK)  where OrderNumber=" + ONX.ToString(), dbconn))
+								using(IDataReader rs2 = DB.GetRS(String.Format("SELECT CardNumber, CardName, Last4, CardExpirationMonth, CardExpirationYear, CardNumber, CardType, {0} FROM Orders WHERE OrderNumber = {1}", AppLogic.AppConfig("OrdersCCSaltField"), ONX), dbconn))
 								{
 									if(rs2.Read())
 									{

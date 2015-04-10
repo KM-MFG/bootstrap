@@ -25,10 +25,6 @@
 		adnsf$ = jQuery; <%-- to avoid conflicts with existing jQuery versions and other javascript frameworks, change this line to adnsf$ = jQuery.noConflict(); --%>
 	</script>
 	<script src="App_Templates/Skin_<asp:Literal runat='server' Text='<%$ Tokens:SkinId %>' />/js/bootstrap.min.js" type="text/javascript"></script>
-
-
-	<%--This xmlpackage can be used to add dynamic data to javascripts such as tracking scripts that should run before the closing head tag--%>
-	<aspdnsf:XmlPackage runat="server" PackageName="script.headclose" />
 </head>
 <body>
 	<!-- Respond.js IE8 support of media queries -->

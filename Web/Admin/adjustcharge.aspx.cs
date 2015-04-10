@@ -53,7 +53,7 @@ namespace AspDotNetStorefrontAdmin
 			using(SqlConnection dbconn = new SqlConnection(DB.GetDBConn()))
 			{
 				dbconn.Open();
-				using(IDataReader rs = DB.GetRS(String.Format("select * from Orders with (NOLOCK) where OrderNumber={0}", orderNumber.ToString()), dbconn))
+				using(IDataReader rs = DB.GetRS(String.Format("select OrderTotal, CustomerServiceNotes from Orders with (NOLOCK) where OrderNumber={0}", orderNumber), dbconn))
 				{
 					if(rs.Read())
 					{
@@ -66,7 +66,7 @@ namespace AspDotNetStorefrontAdmin
 				}
 			}
 			txtNewOrderTotal.Text = Localization.CurrencyStringForGatewayWithoutExchangeRate(orderTotal);
-			txtCustomerServiceNotes.Text = Server.HtmlEncode(customerServiceNotes);
+			txtCustomerServiceNotes.Text = customerServiceNotes;
 		}
 
 		protected void btnSubmit_Click(object sender, EventArgs e)

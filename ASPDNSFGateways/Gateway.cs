@@ -265,7 +265,7 @@ namespace AspDotNetStorefrontGateways
 			using (SqlConnection con = new SqlConnection(DB.GetDBConn()))
 			{
 				con.Open();
-				using (IDataReader rs = DB.GetRS("Select * from Orders  with (NOLOCK)  where OrderNumber=" + OrderNumber.ToString(), con))
+				using(IDataReader rs = DB.GetRS(String.Format("Select CapturedOn from Orders  with (NOLOCK) where OrderNumber = {0}", OrderNumber), con))
 				{
 					if (rs.Read())
 					{
@@ -2011,6 +2011,8 @@ namespace AspDotNetStorefrontGateways
 			if (Status != AppLogic.ro_OK && Status != AppLogic.ro_3DSecure)
 			{
 				// record failed TX:
+				try
+				{
 				String txout = TransactionCommand;
 				String txresponse = TransactionResponse;
 				if (UseBillingAddress.CardNumber != null && UseBillingAddress.CardNumber.Length != 0)
@@ -2044,6 +2046,11 @@ namespace AspDotNetStorefrontGateways
 				}
 				String sql = "insert into FailedTransaction(CustomerID,OrderNumber,IPAddress,OrderDate,PaymentGateway,PaymentMethod,TransactionCommand,TransactionResult) values(" + CustomerID.ToString() + "," + OrderNumber.ToString() + "," + DB.SQuote(IP) + ",getdate()," + DB.SQuote(GW) + "," + DB.SQuote(AppLogic.ro_PMCreditCard) + "," + DB.SQuote(txout) + "," + DB.SQuote(txresponse) + ")";
 				DB.ExecuteSQL(sql);
+				}
+				catch
+				{
+					throw new Exception(AppLogic.GetString("gateway.ConfigurationIssue", cart.ThisCustomer.LocaleSetting));
+				}
 			}
 			return Status;
 		}

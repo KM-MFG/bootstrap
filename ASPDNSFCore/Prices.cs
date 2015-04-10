@@ -1070,7 +1070,7 @@ namespace AspDotNetStorefrontCore
                 using (SqlConnection con = new SqlConnection(DB.GetDBConn()))
                 {
                     con.Open();
-                    using (IDataReader rs = DB.GetRS("select * from productvariant   with (NOLOCK)  where VariantID=" + VariantID.ToString(), con))
+                    using (IDataReader rs = DB.GetRS(String.Format("select Price, SalePrice from productvariant with (NOLOCK) where VariantID = {0}", VariantID), con))
                     {
                         if (rs.Read())
                         {
@@ -1268,7 +1268,7 @@ namespace AspDotNetStorefrontCore
             using (SqlConnection con = new SqlConnection(DB.GetDBConn()))
             {
                 con.Open();
-                using (IDataReader rs = DB.GetRS("select * from product   with (NOLOCK)  left outer join productvariant   with (NOLOCK)  on product.productid=productvariant.productid where saleprice IS NOT NULL and saleprice<>price and product.productid=" + ProductID.ToString(), con))
+                using (IDataReader rs = DB.GetRS(String.Format("select Price, SalePrice from product with (NOLOCK) left outer join productvariant with (NOLOCK) on product.productid=productvariant.productid where saleprice IS NOT NULL and saleprice<>price and product.productid = {0}", ProductID), con))
                 {
                     if (rs.Read())
                     {

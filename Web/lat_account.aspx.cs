@@ -104,11 +104,11 @@ namespace AspDotNetStorefront
                 EMail.Text = a.EMail.ToLowerInvariant().Trim();
                 AffPassword.Text = String.Empty;
                 AffPassword2.Text = String.Empty;
-                Company.Text = Server.HtmlEncode(a.Company);
-                Address1.Text = Server.HtmlEncode(a.Address1);
-                Address2.Text = Server.HtmlEncode(a.Address2);
-                Suite.Text = Server.HtmlEncode(a.Suite);
-                City.Text = Server.HtmlEncode(a.City);
+                Company.Text = a.Company;
+                Address1.Text = a.Address1;
+                Address2.Text = a.Address2;
+                Suite.Text = a.Suite;
+                City.Text = a.City;
 
                 AffState = a.State;
 
@@ -124,7 +124,7 @@ namespace AspDotNetStorefront
                     }
                 }
 
-                Zip.Text = Server.HtmlEncode(a.Zip);
+                Zip.Text = a.Zip;
 
                 AffCountry = a.Country;
 
@@ -140,7 +140,7 @@ namespace AspDotNetStorefront
                     }
                 }
 
-                Phone.Text = Server.HtmlEncode(a.Phone);
+                Phone.Text = a.Phone;
 
                 //Website Data
                 WebSiteName.Text = a.WebSiteName;

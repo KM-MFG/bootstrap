@@ -1,25 +1,28 @@
-<%@ Page Language="C#" AutoEventWireup="true" CodeFile="entityproductbulkdisplayorder.aspx.cs" Inherits="AspDotNetStorefrontAdmin.Admin_entityProductBulkDisplayOrder" Theme="Admin_Default" %>
+<%@ Page Language="C#" AutoEventWireup="true" CodeFile="entityproductbulkdisplayorder.aspx.cs" Inherits="AspDotNetStorefrontAdmin.EntityProductBulkDisplayOrder" Theme="Admin_Default" %>
 
 <html>
-<head id="Head1" runat="server">
+<head runat="server">
+	<title>Entity Product Bulk Display Order</title>
 	<script src="Scripts/jquery.min.js" type="text/javascript"></script>
 	<script src="Scripts/bootstrap.min.js" type="text/javascript"></script>
 </head>
 
 <body>
-	<form id="frmEntityBulk" runat="server">
-		<aspdnsf:AlertMessage runat="server" ID="AlertMessage" />
-		<asp:Panel ID="MainBody" runat="server" DefaultButton="SubmitButton">
-			<div class="item-action-bar">
-				<asp:Button runat="server" ID="SubmitButton" Text="Save Display Order" CssClass="btn btn-primary btn-sm" />
-			</div>
+	<form runat="server">
 
-			<asp:Literal ID="ltBody" runat="server"></asp:Literal>
+	<aspdnsf:AlertMessage runat="server" ID="AlertMessage" />
 
-			<div class="item-action-bar">
-				<asp:Button runat="server" ID="SubmitButtonBottom" Text="Save Display Order" CssClass="btn btn-primary btn-sm" />
-			</div>
-		</asp:Panel>
+	<asp:Panel runat="server" Visible='<%#EntityCount > 0 %>' DefaultButton="btnSubmit">
+		<div class="item-action-bar">
+			<asp:Button ID="btnSubmit" runat="server" Text="Save Display Order" CssClass="btn btn-primary btn-sm" OnClick="btnSubmit_Click" />
+		</div>
+
+		<asp:Literal ID="RenderContainer" runat="server" />
+
+		<div class="item-action-bar">
+			<asp:Button runat="server" Text="Save Display Order" CssClass="btn btn-primary btn-sm" OnClick="btnSubmit_Click" />
+		</div>
+	</asp:Panel>
 	</form>
 </body>
 </html>

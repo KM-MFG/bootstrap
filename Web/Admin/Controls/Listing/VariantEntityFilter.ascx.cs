@@ -8,18 +8,21 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Web.UI.WebControls;
-using AspDotNetStorefrontCore;
 
 namespace AspDotNetStorefrontControls.Listing
 {
 	public partial class VariantEntityFilter : FilterControl
 	{
 		const string FallbackEntityType = "Category";
+		const string DefaultVariantIdColumnName = "VariantID";
 
 		public string Label
 		{ get; set; }
 
 		public string EntityType
+		{ get; set; }
+
+		public string VariantIdColumnName
 		{ get; set; }
 
 		protected override void OnPreRender(EventArgs e)
@@ -39,14 +42,15 @@ namespace AspDotNetStorefrontControls.Listing
 				String.Format(
 					@"(
 						@{0} is null or 
-						VariantId in (
+						{1} in (
 							select pv.VariantId
-							from {1} e
-								inner join Product{1} pe on e.{1}ID = pe.{1}ID
+							from {2} e
+								inner join Product{2} pe on e.{2}ID = pe.{2}ID
 								inner join ProductVariant pv on pv.ProductID = pe.ProductID
-							where e.Name like '%' + @{0} + '%')
+							where charindex(@{0}, e.Name) > 0)
 					)",
 					valueParameterName,
+					VariantIdColumnName ?? DefaultVariantIdColumnName,
 					EntityType ?? FallbackEntityType),
 				new[] { new ControlParameter(valueParameterName, System.Data.DbType.String, Value.UniqueID, "Text") });
 		}

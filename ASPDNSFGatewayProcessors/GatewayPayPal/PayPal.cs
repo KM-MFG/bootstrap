@@ -42,7 +42,7 @@ namespace AspDotNetStorefrontGateways.Processors
         {
             get
             {
-				return "See <a href='http://www.aspdotnetstorefront.com/linkmanager.aspx?topic=9500manual&type=paypalpaymentspro' target='_blank'>Manual</a>.";
+				return "See <a href='http://www.aspdotnetstorefront.com/linkmanager.aspx?topic=9510manual&type=paypalpaymentspro' target='_blank'>Manual</a>.";
             }
         }
 

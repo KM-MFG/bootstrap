@@ -43,7 +43,7 @@ namespace AspDotNetStorefrontControls.Listing
 			return new FilterClause(
 				String.IsNullOrWhiteSpace(FieldName)
 					? null
-					: String.Format("(@{0} is null or {1} like '%' + @{0} + '%')", selectedValueParameterName, FieldName),
+					: String.Format("(@{0} is null or charindex(@{0}, {1}) > 0)", selectedValueParameterName, FieldName),
 				new[] { new ControlParameter(selectedValueParameterName, System.Data.DbType.String, Value.UniqueID, "Text") });
 		}
 	}

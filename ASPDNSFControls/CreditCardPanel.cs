@@ -748,8 +748,6 @@ namespace AspDotNetStorefrontControls
             this.Controls.Add(new LiteralControl("<div class='form-text'>"));
             this.Controls.Add(_lblHeader);
             this.Controls.Add(new LiteralControl("</div>"));
-            this.Controls.Add(new LiteralControl("<script type=\"text/javascript\" language=\"Javascript\" src=\"jscripts/tooltip.js\" >\n"));
-            this.Controls.Add(new LiteralControl("</script>\n"));
 
             this.Controls.Add(new LiteralControl("<div class='form-group'>"));
             this.Controls.Add(new LiteralControl("<label>"));

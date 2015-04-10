@@ -24,11 +24,22 @@ namespace AspDotNetStorefrontAdmin
 		readonly XmlPackageManager XmlPackageManager;
 		int EntityId;
 		string EntityName;
-		String Locale;
 		EntityHelper Entity;
 		EntitySpecs EntitySpecs;
 		int CurrentSkinID = 1;
 		bool UseHtmlEditor;
+
+		string selectedLocale;
+		String Locale
+		{
+			get
+			{
+				if (String.IsNullOrEmpty(selectedLocale))
+					selectedLocale = LocaleSelector.GetSelectedLocale().Name;
+
+				return selectedLocale;
+			}
+		}
 
 		public ProductEditor()
 		{
@@ -37,9 +48,6 @@ namespace AspDotNetStorefrontAdmin
 
 		protected override void OnPreRender(EventArgs e)
 		{
-			//Locale needs to be set for QuickAdd
-			GetPageLocale();
-
 			if(QuickAddManufacturer.EntityName != null)
 				LoadManufacturers(QuickAddManufacturer.EntityId);
 
@@ -75,10 +83,8 @@ namespace AspDotNetStorefrontAdmin
 
 			// Determine HTML editor configuration
 			UseHtmlEditor = !AppLogic.AppConfigBool("TurnOffHtmlEditorInAdminSite");
-			radSummary.Visible = UseHtmlEditor;
-			radSummary.DisableFilter(Telerik.Web.UI.EditorFilters.RemoveScripts);
-			radDescription.Visible = UseHtmlEditor;
-			radDescription.DisableFilter(Telerik.Web.UI.EditorFilters.RemoveScripts);
+			radSummary.Visible = radDescription.Visible = UseHtmlEditor;
+			txtSummaryNoHtmlEditor.Visible = txtDescriptionNoHtmlEditor.Visible =  !UseHtmlEditor;
 
 			ProductId = CommonLogic.QueryStringNativeInt("productid");
 			if((int?)ViewState["ProductEditID"] > 0)
@@ -115,26 +121,6 @@ namespace AspDotNetStorefrontAdmin
 			{
 				liStoreMappingTab.Visible = etsMapper.StoreCount > 1;
 				btnDeleteAll.Attributes.Add("onclick", "return confirm('Confirm Delete');");
-
-				if(ThisCustomer.ThisCustomerSession.Session("entityUserLocale").Length == 0)
-				{
-					ThisCustomer.ThisCustomerSession.SetVal("entityUserLocale", Localization.GetDefaultLocale());
-				}
-
-				ddLocale.Items.Clear();
-
-				using(System.Data.DataTable dtLocale = Localization.GetLocales())
-				{
-					foreach(DataRow dr in dtLocale.Rows)
-					{
-						ddLocale.Items.Add(new ListItem(DB.RowField(dr, "Description"), DB.RowField(dr, "Name")));
-					}
-				}
-
-				if(ddLocale.Items.Count < 2)
-				{
-					pnlLocale.Visible = false;
-				}
 				LoadContent();
 			}
 
@@ -151,8 +137,6 @@ namespace AspDotNetStorefrontAdmin
 			ddOnSalePrompt.Items.Clear();
 			ddType.Items.Clear();
 			ddTaxClass.Items.Clear();
-
-			GetPageLocale();
 
 			bool ProductTracksInventoryBySizeAndColor = AppLogic.ProductTracksInventoryBySizeAndColor(ProductId);
 			bool IsAKit = AppLogic.IsAKit(ProductId);
@@ -423,11 +407,7 @@ namespace AspDotNetStorefrontAdmin
 						}
 						else
 						{
-							ltDescription.Text = ("<div class=\"form-group\">");
-							ltDescription.Text += ("<div class=\"col-sm-6\">");
-							ltDescription.Text += ("<textarea class=\"form-control multiExtension\" id=\"Description\" name=\"Description\">" + XmlCommon.GetLocaleEntry(HttpContext.Current.Server.HtmlEncode(DB.RSField(rs, "Description")), Locale, false) + "</textarea>\n");
-							ltDescription.Text += ("</div>");
-							ltDescription.Text += ("</div>");
+							txtDescriptionNoHtmlEditor.Text = XmlCommon.GetLocaleEntry(DB.RSField(rs, "Description"), Locale, false);
 						}
 
 						//SUMMARY
@@ -437,11 +417,7 @@ namespace AspDotNetStorefrontAdmin
 						}
 						else
 						{
-							ltSummary.Text = ("<div class=\"form-group\">");
-							ltSummary.Text += ("<div class=\"col-sm-6\">");
-							ltSummary.Text += ("<textarea class=\"form-control multiExtension\" id=\"Summary\" name=\"Summary\">" + XmlCommon.GetLocaleEntry(HttpContext.Current.Server.HtmlEncode(DB.RSField(rs, "Summary")), Locale, false) + "</textarea>\n");
-							ltSummary.Text += ("</div>");
-							ltSummary.Text += ("</div>");
+							txtSummaryNoHtmlEditor.Text = XmlCommon.GetLocaleEntry(DB.RSField(rs, "Summary"), Locale, false);
 						}
 
 						//FROOGLE
@@ -677,23 +653,6 @@ namespace AspDotNetStorefrontAdmin
 							}
 						}
 
-						if(!UseHtmlEditor)
-						{
-							//DESCRIPTION
-							ltDescription.Text = ("<div class=\"form-group\">");
-							ltDescription.Text += ("<div class=\"col-sm-6\">");
-							ltDescription.Text += ("<textarea class=\"form-control multiExtension\" id=\"Description\" name=\"Description\"></textarea>\n");
-							ltDescription.Text += ("</div>");
-							ltDescription.Text += ("</div>");
-
-							//SUMMARY
-							ltSummary.Text = ("<div class=\"form-group\">");
-							ltSummary.Text += ("<div class=\"col-sm-6\">");
-							ltSummary.Text += ("<textarea class=\"form-control multiExtension\" id=\"Summary\" name=\"Summary\"></textarea>\n");
-							ltSummary.Text += ("</div>");
-							ltSummary.Text += ("</div>");
-						}
-
 						//EXTENSION DATA
 						txtExtensionData.Text = CommonLogic.IIF(Editing, DB.RSField(rs, "ExtensionData"), "");
 						txtExtensionData2.Text = CommonLogic.IIF(Editing, DB.RSField(rs, "ExtensionData2"), "");
@@ -801,25 +760,6 @@ namespace AspDotNetStorefrontAdmin
 			}
 		}
 
-		private void GetPageLocale()
-		{
-			//pull locale from user session
-			string sessionLocale = ThisCustomer.ThisCustomerSession.Session("entityUserLocale");
-
-			if(!String.IsNullOrEmpty(sessionLocale))
-			{
-				Locale = Localization.CheckLocaleSettingForProperCase(sessionLocale);
-			}
-			else if(!String.IsNullOrEmpty(ddLocale.SelectedValue))
-			{
-				Locale = Localization.CheckLocaleSettingForProperCase(ddLocale.SelectedValue);
-			}
-			else
-			{
-				Locale = Localization.GetDefaultLocale();
-			}
-		}
-
 		private void LoadDistributors()
 		{
 			LoadDistributors(0);
@@ -855,7 +795,7 @@ namespace AspDotNetStorefrontAdmin
 		{
 			ddManufacturer.Items.Clear();
 			ddManufacturer.Items.Add(new ListItem(" - Select -", "0"));
-			string sql = "select * from Manufacturer  with (NOLOCK)  where deleted=0 order by DisplayOrder,Name";
+			string sql = "select Name, ManufacturerID from Manufacturer  with (NOLOCK)  where deleted=0 order by DisplayOrder,Name";
 
 			using(SqlConnection conn = new SqlConnection(DB.GetDBConn()))
 			{
@@ -1001,52 +941,46 @@ namespace AspDotNetStorefrontAdmin
 			}
 		}
 
-		protected void ddLocale_SelectedIndexChanged(object sender, EventArgs e)
+
+		protected void LocaleSelector_SelectedLocaleChanged(Object sender, EventArgs e)
 		{
-			if(ddLocale.SelectedValue != string.Empty)
-			{
-				ThisCustomer.ThisCustomerSession.SetVal("entityUserLocale", ddLocale.SelectedValue);
-			}
-			else
-			{
-				ThisCustomer.ThisCustomerSession.SetVal("entityUserLocale", Localization.GetDefaultLocale());
-			}
 			LoadContent();
 		}
 
 		protected void btnSubmit_Click(object sender, EventArgs e)
 		{
-			UpdateProduct();
+			if(!UpdateProduct())
+				return;
+
 			etsMapper.Save();
 			LoadContent();
 		}
 
 		protected void btnSaveAndClose_Click(object sender, EventArgs e)
 		{
-			UpdateProduct();
+			if(!UpdateProduct())
+				return;
+
 			etsMapper.Save();
 			Response.Redirect(ReturnUrlTracker.GetReturnUrl());
 		}
 
-		protected void UpdateProduct()
+		protected bool UpdateProduct()
 		{
 			if(!Page.IsValid)
-				return;
+				return false;
 
 			var editing = Localization.ParseBoolean(ViewState["ProductEdit"].ToString());
-			var locale = ddLocale.SelectedValue;
-			if(String.IsNullOrEmpty(locale))
-				locale = Localization.GetDefaultLocale();
 
 			var productParameters = new[]
 				{
 					new SqlParameter(
 						"Name", 
-						AppLogic.FormLocaleXml("Name", txtName.Text, locale, "Product", ProductId)),
+						AppLogic.FormLocaleXml("Name", txtName.Text, Locale, "Product", ProductId)),
 
 					new SqlParameter(
 						"SEName", 
-						SE.MungeName(AppLogic.GetFormsDefaultLocale("Name", txtName.Text, locale, "Product", ProductId))),
+						SE.MungeName(AppLogic.GetFormsDefaultLocale("Name", txtName.Text, Locale, "Product", ProductId))),
 
 					new SqlParameter("ImageFilenameOverride", txtImageOverride.Text),
 
@@ -1060,8 +994,8 @@ namespace AspDotNetStorefrontAdmin
 							"Summary", 
 							UseHtmlEditor 
 								? radSummary.Content 
-								: "Summary", 
-							locale, 
+								: txtSummaryNoHtmlEditor.Text.Trim(), 
+							Locale, 
 							"Product", 
 							ProductId)),
 
@@ -1071,8 +1005,8 @@ namespace AspDotNetStorefrontAdmin
 							"Description", 
 							UseHtmlEditor 
 								? radDescription.Content 
-								: "Description", 
-							locale, 
+								: txtDescriptionNoHtmlEditor.Text.Trim(), 
+							Locale, 
 							"Product", 
 							ProductId)),
 
@@ -1084,17 +1018,17 @@ namespace AspDotNetStorefrontAdmin
 
 					new SqlParameter(
 						"ColorOptionPrompt", 
-						AppLogic.FormLocaleXml("ColorOptionPrompt", txtColorOption.Text, locale, "Product", ProductId)),
+						AppLogic.FormLocaleXml("ColorOptionPrompt", txtColorOption.Text, Locale, "Product", ProductId)),
 
 					new SqlParameter(
 						"SizeOptionPrompt", 
-						AppLogic.FormLocaleXml("SizeOptionPrompt", txtSizeOption.Text, locale, "Product", ProductId)),
+						AppLogic.FormLocaleXml("SizeOptionPrompt", txtSizeOption.Text, Locale, "Product", ProductId)),
 
 					new SqlParameter("RequiresTextOption", rblRequiresTextField.SelectedValue == "1"),
 
 					new SqlParameter(
 						"TextOptionPrompt", 
-						AppLogic.FormLocaleXml("TextOptionPrompt", txtTextFieldPrompt.Text, locale, "Product", ProductId)),
+						AppLogic.FormLocaleXml("TextOptionPrompt", txtTextFieldPrompt.Text, Locale, "Product", ProductId)),
 
 					new SqlParameter(
 						"TextOptionMaxLength", 
@@ -1104,7 +1038,7 @@ namespace AspDotNetStorefrontAdmin
 
 					new SqlParameter(
 						"FroogleDescription", 
-						AppLogic.FormLocaleXml("FroogleDescription", txtFroogle.Text, locale, "Product", ProductId)),
+						AppLogic.FormLocaleXml("FroogleDescription", txtFroogle.Text, Locale, "Product", ProductId)),
 					
 					new SqlParameter(
 						"RelatedProducts", 
@@ -1132,25 +1066,25 @@ namespace AspDotNetStorefrontAdmin
 						"SEKeywords", 
 						String.IsNullOrWhiteSpace(txtSEKeywords.Text)
 							? DBNull.Value
-							: (object)AppLogic.FormLocaleXml("SEKeywords", txtSEKeywords.Text, locale, "Product", ProductId)),
+							: (object)AppLogic.FormLocaleXml("SEKeywords", txtSEKeywords.Text, Locale, "Product", ProductId)),
 
 					new SqlParameter(
 						"SEDescription", 
 						String.IsNullOrWhiteSpace(txtSEDescription.Text)
 							? DBNull.Value 
-							: (object)AppLogic.FormLocaleXml("SEDescription", txtSEDescription.Text, locale, "Product", ProductId)),
+							: (object)AppLogic.FormLocaleXml("SEDescription", txtSEDescription.Text, Locale, "Product", ProductId)),
 
 					new SqlParameter(
 						"SETitle", 
 						String.IsNullOrWhiteSpace(txtSETitle.Text)
 							? DBNull.Value 
-							: (object)AppLogic.FormLocaleXml("SETitle", txtSETitle.Text, locale, "Product", ProductId)),
+							: (object)AppLogic.FormLocaleXml("SETitle", txtSETitle.Text, Locale, "Product", ProductId)),
 
 					new SqlParameter(
 						"SEAltText", 
 						String.IsNullOrWhiteSpace(txtSEAlt.Text)
 							? DBNull.Value 
-							: (object)AppLogic.FormLocaleXml("SEAltText", txtSEAlt.Text, locale, "Product", ProductId)),
+							: (object)AppLogic.FormLocaleXml("SEAltText", txtSEAlt.Text, Locale, "Product", ProductId)),
 
 					new SqlParameter(
 						"SKU", 
@@ -1603,6 +1537,8 @@ namespace AspDotNetStorefrontAdmin
 			HandleImageSubmits();
 
 			LoadContent();
+
+			return true;
 		}
 
 		public void HandleImageSubmits()
@@ -1610,14 +1546,9 @@ namespace AspDotNetStorefrontAdmin
 			// handle image uploaded:
 			String FN = txtImageOverride.Text.Trim();
 			if(AppLogic.AppConfigBool("UseSKUForProductImageName"))
-			{
-				// txtSKU is in a RadWindow, so needs to be accessed through UniqueID: tabContainer$pnlMain$txtSKU
-				FN = CommonLogic.FormCanBeDangerousContent("tabContainer$pnlMain$txtSKU").Trim();
-			}
+				FN = txtSKU.Text.Trim();
 			if(FN.Length == 0)
-			{
 				FN = ProductId.ToString();
-			}
 
 			String Image1 = String.Empty;
 			String TempImage1 = String.Empty;
@@ -1793,5 +1724,26 @@ namespace AspDotNetStorefrontAdmin
 			ctrlAlertMessage.PushAlertMessage("All variants have been deleted", AlertMessage.AlertType.Success);
 		}
 
+		protected void NameLength_ServerValidate(object source, ServerValidateEventArgs args)
+		{
+			var nameFieldLength = DB.GetSqlN(
+				@"select CHARACTER_MAXIMUM_LENGTH [N]
+				from INFORMATION_SCHEMA.COLUMNS
+				where TABLE_SCHEMA = 'dbo' and TABLE_NAME = 'Product' and COLUMN_NAME = 'Name'");
+
+			// Always accept on a MAX length
+			if(nameFieldLength == -1)
+			{
+				args.IsValid = true;
+				return;
+			}
+
+			// Make sure the generated data is less than the field length
+			var fullMlData = AppLogic.FormLocaleXml("Name", args.Value, Locale, "Product", ProductId);
+			args.IsValid = fullMlData.Length <= nameFieldLength;
+
+			if(!args.IsValid)
+				ClientScript.RegisterStartupScript(this.GetType(), "Name Length Violation Popup", String.Format("alert('- {0}');", NameLengthValidator.ErrorMessage), true);
+		}
 	}
 }

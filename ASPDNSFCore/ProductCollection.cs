@@ -226,9 +226,6 @@ namespace AspDotNetStorefrontCore
 					cmd.Parameters.Add(new SqlParameter("@ViewType", SqlDbType.Int));
 					cmd.Parameters["@ViewType"].Value = CommonLogic.IIF(m_ReturnAllVariants || m_SearchMatch.Length != 0, 0, 1);
 
-					cmd.Parameters.Add(new SqlParameter("@ExcludePacks", SqlDbType.Int));
-					cmd.Parameters["@ExcludePacks"].Value = CommonLogic.IIF(m_ExcludePacks, 1, 0);
-
 					cmd.Parameters.Add(new SqlParameter("@ExcludeKits", SqlDbType.Int));
 					cmd.Parameters["@ExcludeKits"].Value = CommonLogic.IIF(m_ExcludeKits, 1, 0);
 
@@ -257,7 +254,7 @@ namespace AspDotNetStorefrontCore
 					{
 						// no paging
 						cmd.Parameters.Add(new SqlParameter("@pagesize", SqlDbType.Int));
-						cmd.Parameters["@pagesize"].Value = 9999999; // shouldn't ever exceed this, but of course, someone will. someday, and blame us :)
+						cmd.Parameters["@pagesize"].Value = 9999999;
 
 						cmd.Parameters.Add(new SqlParameter("@pagenum", SqlDbType.Int));
 						cmd.Parameters["@pagenum"].Value = m_PageNum;

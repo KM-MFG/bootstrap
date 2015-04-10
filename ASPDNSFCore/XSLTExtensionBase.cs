@@ -1396,7 +1396,7 @@ function popupzoom(url,alturl)
                 using (SqlConnection con = new SqlConnection(DB.GetDBConn()))
                 {
                     con.Open();
-                    string query = "select SKU, ImageFilenameOverride, SEAltText from product where productid = " + sID;
+					var query = string.Format("select SKU, ImageFilenameOverride, SEAltText from product where productid = {0}", sID);
                     using (IDataReader dr = DB.GetRS(query, con))
                     {
                         if (dr.Read())
@@ -1411,16 +1411,18 @@ function popupzoom(url,alturl)
                 if (DesiredSize.Equals("MEDIUM", StringComparison.InvariantCultureIgnoreCase))
                 {
                     StringBuilder tmpS = new StringBuilder(4096);
-                    tmpS.Append("<div class=\"image-wrap medium-image-wrap\">");
+                    tmpS.Append(@"<div class=""image-wrap medium-image-wrap"">");
                     String ProductPicture = String.Empty;
 					ProductPicture = AppLogic.LookupImage("Product", ID, "medium", ThisCustomer.SkinID, ThisCustomer.LocaleSetting);
                     String LargePic = AppLogic.LookupImage("Product", ID, "large", ThisCustomer.SkinID, ThisCustomer.LocaleSetting);
-                    bool HasLargePic = (LargePic.Length != 0);
+                    bool HasLargePic = !LargePic.Contains("nopicture");
                     String LargePicForPopup = LargePic;
+
+					var hasProductPicture = ProductPicture.IndexOf("nopicture") == -1;
 
                     // setup multi-image gallery:
                     ProductImageGallery ImgGal = null;
-                    String ImgGalCacheName = "ImgGal_" + ID.ToString() + "_" + ThisCustomer.SkinID.ToString() + "_" + ThisCustomer.LocaleSetting;
+					var ImgGalCacheName = string.Format("ImgGal_{0}_{1}_{2}", ID, ThisCustomer.SkinID, ThisCustomer.LocaleSetting);
                     if (AppLogic.CachingOn)
                     {
                         ImgGal = (ProductImageGallery)HttpContext.Current.Cache.Get(ImgGalCacheName);
@@ -1440,45 +1442,82 @@ function popupzoom(url,alturl)
                         Size size = CommonLogic.GetImagePixelSize(LargePic);
                         tmpS.Append(Scripts.PopupImage(size));
                     }
-                    tmpS.Append("<div class=\"medium-image-wrap\" id=\"divProductPic" + ID.ToString() + "\">\n");
+					tmpS.AppendFormat(@"<div class=""medium-image-wrap"" id=""divProductPic{0}"">{1}", ID, Environment.NewLine);
                     if (ImgGal.ImgDHTML.Length == 0 || !ImgGal.HasSomeLarge)
                     {
                         if (HasLargePic)
                         {
-                            tmpS.Append("<img id=\"ProductPic" + ID.ToString() + "\" name=\"ProductPic" + ID.ToString() + "\" class=\"product-image large-image img-responsive\" onClick=\"" + CommonLogic.IIF(ImgGal.HasSomeLarge, "popuplarge_" + ID.ToString() + "()", "popupimg('" + LargePicForPopup + "')") + "\" alt=\"" + AltText.Replace("\"", "&quot;") + "\" src=\"" + ProductPicture + "\" />");
+							tmpS.AppendFormat(
+								@"<img id=""ProductPic{0}"" name=""ProductPic{0}"" class=""product-image large-image img-responsive""{1} alt=""{2}"" src=""{3}"" />", 
+								ID, 
+								hasProductPicture 
+									? string.Format(
+										@" onClick=""{0}""", 
+										ImgGal.HasSomeLarge 
+											? string.Format("popuplarge_{0}()", ID) 
+											: string.Format("popupimg('{0}')", LargePicForPopup)) 
+									: string.Empty, 
+								AltText.Replace("\"", "&quot;"), 
+								ProductPicture);
                         }
                         else
                         {
-                            tmpS.Append("<img id=\"ProductPic" + ID.ToString() + "\" name=\"ProductPic" + ID.ToString() + "\" class=\"product-image large-image img-responsive\" src=\"" + ProductPicture + "\" alt=\"" + AltText.Replace("\"", "&quot;") + "\" />");
+							tmpS.AppendFormat(
+								@"<img id=""ProductPic{0}"" name=""ProductPic{0}"" class=""product-image large-image img-responsive"" src=""{1}"" alt=""{2}"" />", 
+								ID, 
+								ProductPicture, 
+								AltText.Replace("\"", "&quot;"));
                         }
                     }
                     else
                     {
                         if (ImgGal.HasSomeLarge)
                         {
-                            tmpS.Append("<img id=\"ProductPic" + ID.ToString() + "\" name=\"ProductPic" + ID.ToString() + "\" class=\"actionelement\" onClick=\"popuplarge_" + ID.ToString() + "()\" alt=\"" + AltText.Replace("\"", "&quot;") + "\" class=\"product-image large-image img-responsive\" src=\"" + ProductPicture + "\" />");
+							tmpS.AppendFormat(
+								@"<img id=""ProductPic{0}"" name=""ProductPic{0}"" class=""{1}""{2} alt=""{3}"" src=""{4}"" />", 
+								ID, 
+								hasProductPicture 
+									? "actionelement product-image large-image img-responsive" 
+									: "product-image large-image img-responsive", 
+								hasProductPicture 
+									? string.Format(@" onClick=""popuplarge_{0}()""", ID) 
+									: string.Empty, 
+								AltText.Replace("\"", "&quot;"), 
+								ProductPicture);
                         }
                         else
                         {
-                            tmpS.Append("<img id=\"ProductPic" + ID.ToString() + "\" name=\"ProductPic" + ID.ToString() + "\" class=\"product-image large-image img-responsive\" src=\"" + ProductPicture + "\" alt=\"" + AltText.Replace("\"", "&quot;") + "\" />");
+							tmpS.AppendFormat(
+								@"<img id=""ProductPic{0}"" name=""ProductPic{0}"" class=""product-image large-image img-responsive"" src=""{1}"" alt=""{2}"" />", 
+								ID, 
+								ProductPicture, 
+								AltText.Replace("\"", "&quot;"));
                         }
                     }
                     tmpS.Append("</div>");
-                    tmpS.Append("<div class=\"image-controls\">");
+                    tmpS.Append(@"<div class=""image-controls"">");
                     if (ImgGal.ImgGalIcons.Length != 0)
                     {
-                        tmpS.Append("<div class=\"image-icons\">");
+                        tmpS.Append(@"<div class=""image-icons"">");
                         tmpS.Append(ImgGal.ImgGalIcons);
                         tmpS.Append("</div>");
                     }
 
-                    if (ImgGal.HasSomeLarge)
+                    if (ImgGal.HasSomeLarge && hasProductPicture)
                     {
-                        tmpS.Append("<div class=\"view-larger-wrap\"><a href=\"javascript:void(0);\" onClick=\"popuplarge_" + ID.ToString() + "();\">" + "showproduct.aspx.43".StringResource() + "</a></div>");
+						tmpS.AppendFormat(
+							@"<div class=""view-larger-wrap""><a href=""javascript:void(0);"" onClick=""popuplarge_{0}()"">{1}</a></div>", 
+							ID, 
+							"showproduct.aspx.43".StringResource());
                     }
-                    else if (HasLargePic)
+					else if(HasLargePic && hasProductPicture)
                     {
-                        tmpS.Append("<div class=\"view-larger-wrap\"><a href=\"javascript:void(0);\" onClick=\"" + CommonLogic.IIF(ImgGal.HasSomeLarge, "popuplarge_" + ID.ToString() + "()", "popupimg('" + LargePicForPopup + "')") + ";\">" + "showproduct.aspx.43".StringResource() + "</a></div>");
+						tmpS.AppendFormat(
+							@"<div class=""view-larger-wrap""><a href=""javascript:void(0);"" onClick=""{0}"">{1}</a></div>", 
+							ImgGal.HasSomeLarge 
+								? string.Format("popuplarge_{0}()", ID) 
+								: string.Format("popupimg('{0}')", LargePicForPopup), 
+							"showproduct.aspx.43".StringResource());
                     }
                     tmpS.Append("</div>");
                     tmpS.Append("</div>");
@@ -1495,7 +1534,11 @@ function popupzoom(url,alturl)
                     }
                     if (result.Length != 0)
                     {
-                        result = "<img id=\"ProductPic" + ID.ToString() + "\" name=\"ProductPic" + ID.ToString() + "\" class=\"actionelement\" src=\"" + result + "\"  alt=\"" + AltText.Replace("\"", "&quot;") + "\" />";
+						result = string.Format(
+							@"<img id=""ProductPic{0}"" name=""ProductPic{0}"" class=""actionelement"" src=""{1}"" alt=""{2}"" />", 
+							ID, 
+							result, 
+							AltText.Replace("\"", "&quot;"));
                     }
                 }
             }
@@ -1510,7 +1553,7 @@ function popupzoom(url,alturl)
                 using (SqlConnection con = new SqlConnection(DB.GetDBConn()))
                 {
                     con.Open();
-                    string query = "select ImageFilenameOverride, SEAltText from " + EntityOrObjectName + " where " + EntityOrObjectName + "ID = " + sID;
+					var query = string.Format("select ImageFilenameOverride, SEAltText from {0} where {0}ID = {1}", EntityOrObjectName, sID);
                     using (IDataReader dr = DB.GetRS(query, con))
                     {
                         if (dr.Read())
@@ -1521,7 +1564,11 @@ function popupzoom(url,alturl)
                     }
                 }
                 result = AppLogic.LookupImage(EntityOrObjectName, ID, IFO, "", DesiredSize, ThisCustomer.SkinID, ThisCustomer.LocaleSetting);
-                result = "<img id=\"EntityPic" + ID.ToString() + "\" class=\"actionelement\" src=\"" + result + "\" alt=\"" + AltText.Replace("\"", "&quot;") + "\">";
+				result = string.Format(
+					@"<img id=""EntityPic{0}"" class=""actionelement"" src=""{1}"" alt=""{2}"" />", 
+					ID, 
+					result, 
+					AltText.Replace("\"", "&quot;"));
             }
             return result;
         }
@@ -1603,7 +1650,14 @@ function popupzoom(url,alturl)
             if (DesiredSize.Equals("ICON", StringComparison.InvariantCultureIgnoreCase))
             {				
 				result = AppLogic.LookupImage("Product", ProductID, ImageFileNameOverride, SKU, "icon", ThisCustomer.SkinID, ThisCustomer.LocaleSetting);
-                result = "<img id=\"ProductPic" + ProductID.ToString() + "\" name=\"" + CommonLogic.IIF(AppLogic.AppConfigBool("NameImagesBySEName") && !String.IsNullOrEmpty(seName), seName, "ProductPic" + ProductID.ToString()) + "\" class=\"product-image icon-image img-responsive\" src=\"" + result + "\" />";
+				result = string.Format(
+					@"<img id=""ProductPic{0}"" name=""{1}"" class=""product-image icon-image img-responsive"" src=""{2}"" />", 
+					ProductID, 
+					AppLogic.AppConfigBool("NameImagesBySEName") && !String.IsNullOrEmpty(seName)
+						? seName
+						: string.Format("ProductPic{0}", ProductID), 
+					result);
+
                 if (IncludeATag)
                 {
                     result = ProductLink(ProductID.ToString(), "", "TRUE", result);
@@ -1612,20 +1666,22 @@ function popupzoom(url,alturl)
             else
             {
                 StringBuilder tmpS = new StringBuilder(4096);
-                tmpS.Append("<div class=\"image-wrap product-image-wrap\">");
+                tmpS.Append(@"<div class=""image-wrap product-image-wrap"">");
                 String ProductPicture = String.Empty;
 				ProductPicture = AppLogic.LookupImage("Product", ProductID, ImageFileNameOverride, SKU, "medium", ThisCustomer.SkinID, ThisCustomer.LocaleSetting);
                 String LargePic = AppLogic.LookupImage("Product", ProductID, ImageFileNameOverride, SKU, "large", ThisCustomer.SkinID, ThisCustomer.LocaleSetting);
-                bool HasLargePic = (LargePic.Length != 0);
+                bool HasLargePic = !LargePic.Contains("nopicture");
                 String LargePicForPopup = LargePic;
 
                 String ZoomifyPath = AppLogic.ZoomifyDirectory("PRODUCT", ProductID);
                 bool ZoomifyLarge = ZoomifyPath.Length != 0 && AppLogic.AppConfigBool("Zoomify.ProductLarge");
                 bool ZoomifyMedium = ZoomifyPath.Length != 0 && AppLogic.AppConfigBool("Zoomify.ProductMedium");
 
+				var hasProductPicture = ProductPicture.IndexOf("nopicture") == -1;
+
                 // setup multi-image gallery:
                 ProductImageGallery ImgGal = null;
-                String ImgGalCacheName = "ImgGal_" + ProductID.ToString() + "_" + ThisCustomer.SkinID.ToString() + "_" + ThisCustomer.LocaleSetting;
+				var ImgGalCacheName = string.Format("ImgGal_{0}_{1}_{2}", ProductID, ThisCustomer.SkinID, ThisCustomer.LocaleSetting);
                 if (AppLogic.CachingOn)
                 {
                     ImgGal = (ProductImageGallery)HttpContext.Current.Cache.Get(ImgGalCacheName);
@@ -1640,12 +1696,12 @@ function popupzoom(url,alturl)
                 }
                 tmpS.Append(ImgGal.ImgDHTML);
 
-                if (ZoomifyLarge)
+				if(ZoomifyLarge && hasProductPicture)
                 {
                     tmpS.Append(Scripts.Zoomify());
                 }
 
-                if (HasLargePic)
+				if(HasLargePic && hasProductPicture)
                 {
                     Size size = CommonLogic.GetImagePixelSize(LargePic);
                     tmpS.Append(Scripts.PopupImage(size));
@@ -1654,46 +1710,96 @@ function popupzoom(url,alturl)
                 if (ZoomifyMedium)
                 {
                     // display flash
-                    tmpS.Append("<div class=\"zoomify-wrap\" id=\"divProductPicZ" + ProductID.ToString() + "\">\n");
+					tmpS.AppendFormat(@"<div class=""zoomify-wrap"" id=""divProductPicZ{0}"">{1}", ProductID, Environment.NewLine);
                     tmpS.Append(AppLogic.ZoomifyMarkup("PRODUCT", ProductID, "medium", ThisCustomer, ThisCustomer.SkinID));
-                    tmpS.Append("</div>\n");
-                    tmpS.Append("<div class=\"medium-image-wrap\" id=\"divProductPic" + ProductID.ToString() + "\" style=\"display:none\">\n");
+					tmpS.AppendFormat("</div>{0}", Environment.NewLine);
+					tmpS.AppendFormat(@"<div class=""medium-image-wrap"" id=""divProductPic{0}"" style=""display:none"">{1}", ProductID, Environment.NewLine);
                 }
                 else
                 {
-                    tmpS.Append("<div id=\"divProductPicZ" + ProductID.ToString() + "\" style=\"display:none\">\n");
-                    tmpS.Append("</div>\n");
-                    tmpS.Append("<div class=\"medium-image-wrap\" id=\"divProductPic" + ProductID.ToString() + "\">\n");
+					tmpS.AppendFormat(@"<div id=""divProductPicZ{0}"" style=""display:none"">{1}", ProductID, Environment.NewLine);
+					tmpS.AppendFormat("</div>{0}", Environment.NewLine);
+					tmpS.AppendFormat(@"<div class=""medium-image-wrap"" id=""divProductPic{0}"">{1}", ProductID, Environment.NewLine);
                 }
 
                 if (ZoomifyLarge)
                 {
                     // img with popupzoom javascript call
-                    tmpS.Append("<img id=\"ProductPic" + ProductID.ToString() + "\" name=\"" + CommonLogic.IIF(AppLogic.AppConfigBool("NameImagesBySEName") && !String.IsNullOrEmpty(seName), seName, "ProductPic" + ProductID.ToString()) + "\" class=\"product-image zoomify-image img-responsive\" onClick=\"" + CommonLogic.IIF(ImgGal.HasSomeLarge, "popuplarge" + "_" + sProductID + "()", "popupzoom('" + ZoomifyPath + "','" + LargePicForPopup + "')") + "\" alt=\"" + AppLogic.GetString("showproduct.aspx.19", ThisCustomer.SkinID, ThisCustomer.LocaleSetting) + "\" src=\"" + ProductPicture + "\">");
+					tmpS.AppendFormat(
+						@"<img id=""ProductPic{0}"" name=""{1}"" class=""product-image zoomify-image img-responsive""{2} alt=""{3}"" src=""{4}"" />", 
+						ProductID, 
+						AppLogic.AppConfigBool("NameImagesBySEName") && !String.IsNullOrEmpty(seName)
+							? seName
+							:  string.Format("ProductPic{0}", ProductID), 
+						hasProductPicture 
+							? string.Format(
+								@" onClick=""{0}""",
+								ImgGal.HasSomeLarge
+									? string.Format("popuplarge_{0}()", sProductID)
+									: string.Format("popupzoom('{0}','{1}')", ZoomifyPath, LargePicForPopup)) 
+							: string.Empty, 
+						AppLogic.GetString("showproduct.aspx.19", ThisCustomer.SkinID, ThisCustomer.LocaleSetting), 
+						ProductPicture);
                 }
                 else if (HasLargePic)
                 {
-                    tmpS.Append("<img id=\"ProductPic" + ProductID.ToString() + "\" name=\"" + CommonLogic.IIF(AppLogic.AppConfigBool("NameImagesBySEName") && !String.IsNullOrEmpty(seName), seName, "ProductPic" + ProductID.ToString()) + "\" class=\"product-image medium-image img-responsive\" onClick=\"" + CommonLogic.IIF(ImgGal.HasSomeLarge, "popuplarge" + "_" + sProductID + "()", "popupimg('" + LargePicForPopup + "')") + "\" alt=\"" + AppLogic.GetString("showproduct.aspx.19", ThisCustomer.SkinID, ThisCustomer.LocaleSetting) + "\" src=\"" + ProductPicture + "\" />");
+					tmpS.AppendFormat(
+						@"<img id=""ProductPic{0}"" name=""{1}"" class=""product-image img-responsive {2}""{3} alt=""{4}"" src=""{5}"" />", 
+						ProductID, 
+						AppLogic.AppConfigBool("NameImagesBySEName") && !String.IsNullOrEmpty(seName)
+							? seName
+							: string.Format("ProductPic{0}", ProductID), 
+						hasProductPicture 
+							? "medium-image medium-image-cursor" 
+							: "medium-image", 
+						hasProductPicture 
+							? string.Format(
+								@" onClick=""{0}""", 
+								ImgGal.HasSomeLarge
+									? string.Format("popuplarge_{0}()", sProductID)
+									: string.Format("popupimg('{0}')", LargePicForPopup)) 
+							: string.Empty, 
+						AppLogic.GetString("showproduct.aspx.19", ThisCustomer.SkinID, ThisCustomer.LocaleSetting), 
+						ProductPicture);
                 }
                 else
                 {
-                    tmpS.Append("<img id=\"ProductPic" + ProductID.ToString() + "\" name=\"" + CommonLogic.IIF(AppLogic.AppConfigBool("NameImagesBySEName") && !String.IsNullOrEmpty(seName), seName, "ProductPic" + ProductID.ToString()) + "\" class=\"product-image medium-image img-responsive\" src=\"" + ProductPicture + "\" />");
+					tmpS.AppendFormat(
+						@"<img id=""ProductPic{0}"" name=""{1}"" class=""product-image img-responsive {2}"" src=""{3}"" />", 
+						ProductID, 
+						AppLogic.AppConfigBool("NameImagesBySEName") && !String.IsNullOrEmpty(seName) 
+							? seName 
+							: string.Format("ProductPic{0}", ProductID), 
+						hasProductPicture 
+							? "medium-image medium-image-cursor" 
+							: "medium-image", 
+						ProductPicture);
                 }
                 tmpS.Append("</div>");
-                tmpS.Append("<div class=\"image-controls\">");
+                tmpS.Append(@"<div class=""image-controls"">");
                 if (ImgGal.ImgGalIcons.Length != 0)
                 {
-                    tmpS.Append("<div class=\"image-icons\">");
+                    tmpS.Append(@"<div class=""image-icons"">");
                     tmpS.Append(ImgGal.ImgGalIcons);
                     tmpS.Append("</div>");
                 }
-                if (ZoomifyLarge)
+                if (ZoomifyLarge && hasProductPicture)
                 {
-                    tmpS.Append("<div class=\"view-larger-wrap\"><a href=\"javascript:void(0);\" onClick=\"" + CommonLogic.IIF(ImgGal.HasSomeLarge, "popuplarge" + "_" + sProductID + "()", "popupzoom('" + ZoomifyPath + "','" + LargePicForPopup + "')") + ";\">" + "showproduct.aspx.43".StringResource() + "</a></div>");
-                }
-                else if (HasLargePic)
+					tmpS.AppendFormat(
+						@"<div class=""view-larger-wrap""><a href=""javascript:void(0);"" onClick=""{0}"">{1}</a></div>", 
+						ImgGal.HasSomeLarge
+							? string.Format("popuplarge_{0}()", sProductID)
+							: string.Format("popupzoom('{0}','{1}')", ZoomifyPath, LargePicForPopup), 
+						"showproduct.aspx.43".StringResource());
+				}
+                else if (HasLargePic && hasProductPicture)
                 {
-                    tmpS.Append("<div class=\"view-larger-wrap\"><a href=\"javascript:void(0);\" onClick=\"" + CommonLogic.IIF(ImgGal.HasSomeLarge, "popuplarge" + "_" + sProductID + "()", "popupimg('" + LargePicForPopup + "')") + ";\">" + "showproduct.aspx.43".StringResource() + "</a></div>");
+					tmpS.AppendFormat(
+						@"<div class=""view-larger-wrap""><a href=""javascript:void(0);"" onClick=""{0}"">{1}</a></div>", 
+						ImgGal.HasSomeLarge 
+							? string.Format("popuplarge_{0}()", sProductID)
+							: string.Format("popupimg('{0}')", LargePicForPopup), 
+						"showproduct.aspx.43".StringResource());
                 }
                 tmpS.Append("</div>");
                 tmpS.Append("</div>");
@@ -1798,12 +1904,19 @@ function popupzoom(url,alturl)
             String AltText = IV.ValidateString("AltText", sAltText);
             string result = String.Empty;
             string seName = AppLogic.GetProductSEName(ProductID, ThisCustomer.LocaleSetting);
-
-
+			
             if (DesiredSize.Equals("ICON", StringComparison.InvariantCultureIgnoreCase))
             {			
 				result = AppLogic.LookupImage("Product", ProductID, ImageFileNameOverride, SKU, "icon", ThisCustomer.SkinID, ThisCustomer.LocaleSetting);
-                result = "<img id=\"ProductPic" + ProductID.ToString() + "\" name=\"" + CommonLogic.IIF(AppLogic.AppConfigBool("NameImagesBySEName") && !String.IsNullOrEmpty(seName), seName, "ProductPic" + ProductID.ToString()) + "\" class=\"product-image icon-image img-responsive\" src=\"" + result + "\" alt=\"" + AltText.Replace("\"", "&quot;") + "\" />";
+				result = string.Format(
+					@"<img id=""ProductPic{0}"" name=""{1}"" class=""product-image icon-image img-responsive"" src=""{2}"" alt=""{3}"" />", 
+					ProductID,
+					AppLogic.AppConfigBool("NameImagesBySEName") && !String.IsNullOrEmpty(seName)
+						? seName
+						: string.Format("ProductPic{0}", ProductID), 
+					result, 
+					AltText.Replace("\"", "&quot;"));
+
                 if (IncludeATag)
                 {
                     result = ProductLink(ProductID.ToString(), "", "TRUE", result);
@@ -1812,20 +1925,22 @@ function popupzoom(url,alturl)
             else
             {
                 StringBuilder tmpS = new StringBuilder(4096);
-                tmpS.Append("<div class=\"image-wrap product-image-wrap\">");
+                tmpS.Append(@"<div class=""image-wrap product-image-wrap"">");
                 String ProductPicture = String.Empty;
 				ProductPicture = AppLogic.LookupImage("Product", ProductID, ImageFileNameOverride, SKU, "medium", ThisCustomer.SkinID, ThisCustomer.LocaleSetting);
                 String LargePic = AppLogic.LookupImage("Product", ProductID, ImageFileNameOverride, SKU, "large", ThisCustomer.SkinID, ThisCustomer.LocaleSetting);
-                bool HasLargePic = (LargePic.Length != 0);
+                bool HasLargePic = !LargePic.Contains("nopicture");
                 String LargePicForPopup = LargePic;
 
                 String ZoomifyPath = AppLogic.ZoomifyDirectory("PRODUCT", ProductID);
                 bool ZoomifyLarge = ZoomifyPath.Length != 0 && AppLogic.AppConfigBool("Zoomify.ProductLarge");
                 bool ZoomifyMedium = ZoomifyPath.Length != 0 && AppLogic.AppConfigBool("Zoomify.ProductMedium");
 
+				var hasProductPicture = ProductPicture.IndexOf("nopicture") == -1;
+
                 // setup multi-image gallery:
                 ProductImageGallery ImgGal = null;
-                String ImgGalCacheName = "ImgGal_" + ProductID.ToString() + "_" + ThisCustomer.SkinID.ToString() + "_" + ThisCustomer.LocaleSetting;
+				var ImgGalCacheName = string.Format("ImgGal_{0}_{1}_{2}", ProductID, ThisCustomer.SkinID, ThisCustomer.LocaleSetting);
                 if (AppLogic.CachingOn)
                 {
                     ImgGal = (ProductImageGallery)HttpContext.Current.Cache.Get(ImgGalCacheName);
@@ -1840,66 +1955,130 @@ function popupzoom(url,alturl)
                 }
                 tmpS.Append(ImgGal.ImgDHTML);
 
-                if (ZoomifyLarge)
+				if(ZoomifyLarge && hasProductPicture)
                 {
                     tmpS.Append(Scripts.Zoomify());
                 }
 
-                if (HasLargePic)
+				if(HasLargePic && hasProductPicture)
                 {
                     tmpS.Append(
                         Scripts.PopupImage(CommonLogic.GetImagePixelSize(LargePic))
-                        );
+                    );
                 }
 
                 if (ZoomifyMedium)
                 {
                     // display flash
-                    tmpS.Append("<div class=\"zoomify-wrap\" id=\"divProductPicZ" + ProductID.ToString() + "\">\n");
+					tmpS.AppendFormat(@"<div class=""zoomify-wrap"" id=""divProductPicZ{0}"">{1}", ProductID, Environment.NewLine);
                     tmpS.Append(AppLogic.ZoomifyMarkup("PRODUCT", ProductID, "medium", ThisCustomer, ThisCustomer.SkinID));
-                    tmpS.Append("</div>\n");
-                    tmpS.Append("<div class=\"medium-image-wrap\" id=\"divProductPic" + ProductID.ToString() + "\" style=\"display:none\">\n");
+					tmpS.AppendFormat("</div>{0}", Environment.NewLine);
+					tmpS.AppendFormat(@"<div class=""medium-image-wrap"" id=""divProductPic{0}"" style=""display:none"">{1}", ProductID, Environment.NewLine);
                 }
                 else
                 {
-                    tmpS.Append("<div id=\"divProductPicZ" + ProductID.ToString() + "\" style=\"display:none\">\n");
-                    tmpS.Append("</div>\n");
-                    tmpS.Append("<div class=\"medium-image-wrap\" id=\"divProductPic" + ProductID.ToString() + "\">\n");
+					tmpS.AppendFormat(@"<div id=""divProductPicZ{0}"" style=""display:none"">{1}", ProductID, Environment.NewLine);
+					tmpS.AppendFormat("</div>{0}", Environment.NewLine);
+					tmpS.AppendFormat(@"<div class=""medium-image-wrap"" id=""divProductPic{0}"">{1}", ProductID, Environment.NewLine);
                 }
 
                 if (ZoomifyLarge)
                 {
-                    // img with popupzoom javascript call
-                    tmpS.Append("<img id=\"ProductPic" + ProductID.ToString() + "\" name=\"" + CommonLogic.IIF(AppLogic.AppConfigBool("NameImagesBySEName") && !String.IsNullOrEmpty(seName), seName, "ProductPic" + ProductID.ToString()) + "\" class=\"product-image zoomify-image img-responsive\" onClick=\"" + CommonLogic.IIF(ImgGal.HasSomeLarge, "popuplarge" + "_" + sProductID + "()", "popupzoom('" + ZoomifyPath + "','" + LargePicForPopup + "')") + "\" title=\"" + AppLogic.GetString("showproduct.aspx.19", ThisCustomer.SkinID, ThisCustomer.LocaleSetting) + "\" src=\"" + ProductPicture + "\"  alt=\"" + AltText.Replace("\"", "&quot;") + "\"  />");
-                    tmpS.AppendFormat("<input type='hidden' id='popupImageURL' value='{0}' />", ProductPicture);
+                    // img with popupzoom javascript call					
+					tmpS.AppendFormat(
+						@"<img id=""ProductPic{0}"" name=""{1}"" class=""product-image zoomify-image img-responsive""{2} title=""{3}"" src=""{4}"" alt=""{5}"" />", ProductID, 
+						AppLogic.AppConfigBool("NameImagesBySEName") && !String.IsNullOrEmpty(seName)
+							? seName
+							: string.Format("ProductPic{0}", ProductID), 
+						hasProductPicture 
+							? string.Format(
+								@" onClick=""{0}""", 
+								ImgGal.HasSomeLarge
+									? string.Format("popuplarge_{0}()", sProductID)
+									: string.Format("popupzoom('{0}','{1}')", ZoomifyPath, LargePicForPopup)) 
+							: string.Empty, 
+						AppLogic.GetString("showproduct.aspx.19", ThisCustomer.SkinID, ThisCustomer.LocaleSetting), 
+						ProductPicture, 
+						AltText.Replace("\"", "&quot;"));
+
+					if(hasProductPicture)
+					{
+						tmpS.AppendFormat(@"<input type=""hidden"" id=""popupImageURL"" value=""{0}"" />", ProductPicture);
+					}                    
                 }
                 else if (HasLargePic)
                 {
-                    tmpS.Append("<img id=\"ProductPic" + ProductID.ToString() + "\" name=\"" + CommonLogic.IIF(AppLogic.AppConfigBool("NameImagesBySEName") && !String.IsNullOrEmpty(seName), seName, "ProductPic" + ProductID.ToString()) + "\" class=\"product-image medium-image img-responsive\" onClick=\"" + CommonLogic.IIF(ImgGal.HasSomeLarge, "popuplarge" + "_" + sProductID + "()", "popupimg('" + LargePicForPopup + "')") + "\" title=\"" + AppLogic.GetString("showproduct.aspx.19", ThisCustomer.SkinID, ThisCustomer.LocaleSetting) + "\" src=\"" + ProductPicture + "\" alt=\"" + AltText.Replace("\"", "&quot;") + "\" />");
-                    tmpS.AppendFormat("<input type='hidden' id='popupImageURL' value='{0}' />", LargePicForPopup);
+					tmpS.AppendFormat(
+						@"<img id=""ProductPic{0}"" name=""{1}"" class=""product-image img-responsive {2}""{3} title=""{4}"" src=""{5}"" alt=""{6}"" />", 
+						ProductID, 
+						AppLogic.AppConfigBool("NameImagesBySEName") && !String.IsNullOrEmpty(seName)
+							? seName
+							: string.Format("ProductPic{0}", ProductID), 
+						hasProductPicture 
+							? "medium-image medium-image-cursor" 
+							: "medium-image", 
+						hasProductPicture 
+							? string.Format(
+							@" onClick=""{0}""", 
+							ImgGal.HasSomeLarge
+								? string.Format("popuplarge_{0}()", sProductID)
+								: string.Format("popupimg('{0}')", LargePicForPopup)) 
+							: string.Empty, 
+						AppLogic.GetString("showproduct.aspx.19", ThisCustomer.SkinID, ThisCustomer.LocaleSetting), 
+						ProductPicture, 
+						AltText.Replace("\"", "&quot;"));
+
+					if(hasProductPicture)
+					{
+						tmpS.AppendFormat(@"<input type=""hidden"" id=""popupImageURL"" value=""{0}"" />", LargePicForPopup);
+					}
                 }
                 else
                 {
-                    tmpS.Append("<img class=\"product-image medium-image img-responsive\" id=\"ProductPic" + ProductID.ToString() + "\" name=\"" + CommonLogic.IIF(AppLogic.AppConfigBool("NameImagesBySEName") && !String.IsNullOrEmpty(seName), seName, "ProductPic" + ProductID.ToString()) + "\" src=\"" + ProductPicture + "\" alt=\"" + AltText.Replace("\"", "&quot;") + "\" />");
-                    tmpS.AppendFormat("<input type='hidden' id='popupImageURL' value='{0}' />", ProductPicture);
+					tmpS.AppendFormat(
+						@"<img id=""ProductPic{0}"" name=""{1}"" class=""product-image img-responsive {2}"" src=""{3}"" alt=""{4}"" />", 
+						ProductID, 
+						AppLogic.AppConfigBool("NameImagesBySEName") && !String.IsNullOrEmpty(seName)
+							? seName
+							: string.Format("ProductPic{0}", ProductID), 
+						hasProductPicture 
+							? "medium-image medium-image-cursor" 
+							: "medium-image", 
+						ProductPicture, 
+						AltText.Replace("\"", "&quot;"));
+
+					if(hasProductPicture)
+					{
+						tmpS.AppendFormat(@"<input type=""hidden"" id=""popupImageURL"" value=""{0}"" />", ProductPicture);
+					}                    
                 }
-                tmpS.Append("</div>\n");
-                tmpS.Append("<div class=\"image-controls\">");
+				tmpS.AppendFormat("</div>{0}", Environment.NewLine);
+                tmpS.Append(@"<div class=""image-controls"">");
                 if (ImgGal.ImgGalIcons.Length != 0)
                 {
-                    tmpS.Append("<div class=\"image-icons\">");
+                    tmpS.Append(@"<div class=""image-icons"">");
                     tmpS.Append(ImgGal.ImgGalIcons);
                     tmpS.Append("</div>");
                 }
 
-                if (ZoomifyLarge)
+				if(ZoomifyLarge && hasProductPicture)
                 {
-                    tmpS.Append("<div class=\"view-larger-wrap\"><a href=\"javascript:void(0);\" onClick=\"" + CommonLogic.IIF(ImgGal.HasSomeLarge, "popuplarge" + "_" + sProductID + "()", "popupzoom('" + ZoomifyPath + "','" + LargePicForPopup + "')") + ";\">" + "showproduct.aspx.43".StringResource() + "</a></div>");
+					tmpS.AppendFormat(
+						@"<div class=""view-larger-wrap""><a href=""javascript:void(0);"" onClick=""{0}"">{1}</a></div>", 
+						ImgGal.HasSomeLarge 
+							? string.Format("popuplarge_{0}()", sProductID) 
+							: string.Format("popupzoom('{0}','{1}')", ZoomifyPath, LargePicForPopup), 
+						"showproduct.aspx.43".StringResource());
                 }
-                else if (HasLargePic)
+				else if(HasLargePic && hasProductPicture)
                 {
-                    tmpS.Append("<div class=\"pop-large-wrap\"><a href=\"javascript:void(0);\" class=\"pop-large-link\" onClick=\"" + CommonLogic.IIF(ImgGal.HasSomeLarge, "popuplarge" + "_" + sProductID + "()", "popupimg('" + LargePicForPopup + "')") + ";\">" + "showproduct.aspx.43".StringResource() + "</a></div>");
-                    tmpS.AppendFormat("<input type='hidden' id='popupImageURL' value='{0}' />", LargePicForPopup);
+					tmpS.AppendFormat(
+						@"<div class=""pop-large-wrap""><a href=""javascript:void(0);"" class=""pop-large-link"" onClick=""{0}"">{1}</a></div>", 
+						ImgGal.HasSomeLarge
+							? string.Format("popuplarge_{0}()", sProductID)
+							: string.Format("popupimg('{0}')", LargePicForPopup), 
+						"showproduct.aspx.43".StringResource());
+                    tmpS.AppendFormat(@"<input type=""hidden"" id=""popupImageURL"" value=""{0}"" />", LargePicForPopup);
                 }
                 tmpS.Append("</div>");
                 tmpS.Append("</div>");
@@ -1928,23 +2107,32 @@ function popupzoom(url,alturl)
             if (DesiredSize.Equals("ICON", StringComparison.InvariantCultureIgnoreCase))
             {
 				result = AppLogic.LookupImage("VARIANT", VariantID, ImageFileNameOverride, SKU, "icon", ThisCustomer.SkinID, ThisCustomer.LocaleSetting);
-                result = "<img id=\"ProductPic" + VariantID.ToString() + "\" name=\"" + CommonLogic.IIF(AppLogic.AppConfigBool("NameImagesBySEName") && !String.IsNullOrEmpty(seName), seName, "ProductPic" + VariantID.ToString()) + "\" class=\"actionelement\" src=\"" + result + "\" alt=\"" + AltText.Replace("\"", "&quot;") + "\" />";
+				result = string.Format(
+					@"<img id=""ProductPic{0}"" name=""{1}"" src=""{2}"" alt=""{3}"" />", 
+					VariantID, 
+					AppLogic.AppConfigBool("NameImagesBySEName") && !String.IsNullOrEmpty(seName)
+						? seName
+						: string.Format("ProductPic{0}", VariantID), 
+					result, 
+					AltText.Replace("\"", "&quot;"));
             }
             else
             {
                 StringBuilder tmpS = new StringBuilder(4096);
-                tmpS.Append("<div align=\"center\">");
+                tmpS.Append(@"<div align=""center"">");
                 String ProductPicture = String.Empty;
 				ProductPicture = AppLogic.LookupImage("VARIANT", VariantID, ImageFileNameOverride, SKU, "medium", ThisCustomer.SkinID, ThisCustomer.LocaleSetting);
                 String LargePic = AppLogic.LookupImage("VARIANT", VariantID, ImageFileNameOverride, SKU, "large", ThisCustomer.SkinID, ThisCustomer.LocaleSetting);
-                bool HasLargePic = (LargePic.Length != 0);
+                bool HasLargePic = !LargePic.Contains("nopicture");
                 String LargePicForPopup = LargePic;
 
+				var hasProductPicture = ProductPicture.IndexOf("nopicture") == -1;
+
                 String scriptPopup = "";
-                if (HasLargePic)
+				if(HasLargePic && hasProductPicture)
                 {
                     Size s = CommonLogic.GetImagePixelSize(LargePic);
-                    scriptPopup = @"window.open('{0}?src=" + LargePicForPopup + @"','LargerImage{1}','toolbar=no,location=no,directories=no,status=no, menubar=no,scrollbars={2}, resizable={2},copyhistory=no,width={3},height={4},left=0,top=0');";
+					scriptPopup = string.Format("window.open('{{0}}?src={0}','LargerImage{{1}}','toolbar=no,location=no,directories=no,status=no, menubar=no,scrollbars={{2}}, resizable={{2}},copyhistory=no,width={{3}},height={{4}},left=0,top=0');", LargePicForPopup);                    
                     scriptPopup = String.Format(scriptPopup,
                         AppLogic.ResolveUrl("~/popup.aspx"),
                         CommonLogic.GetRandomNumber(1, 100000),
@@ -1954,18 +2142,43 @@ function popupzoom(url,alturl)
                         "");
                 }
 
-                if (HasLargePic)
+				if(HasLargePic && hasProductPicture)
                 {
-                    tmpS.Append("<img id=\"ProductPic" + VariantID.ToString() + "\" name=\"" + CommonLogic.IIF(AppLogic.AppConfigBool("NameImagesBySEName") && !String.IsNullOrEmpty(seName), seName, "ProductPic" + VariantID.ToString()) + "\" class=\"actionelement\" onClick=\"" + scriptPopup + "\" title=\"" + "showproduct.aspx.19".StringResource() + "\" src=\"" + ProductPicture + "\" alt=\"" + AltText.Replace("\"", "&quot;") + "\" />");
+					string.Format(
+						@"<img id=""ProductPic{0}"" name=""{1}""{2} title=""{3}""{4} src=""{5}"" alt=""{6}"" />", 
+						VariantID, 
+						AppLogic.AppConfigBool("NameImagesBySEName") && !String.IsNullOrEmpty(seName)
+							? seName
+							: string.Format("ProductPic{0}", VariantID), 
+						hasProductPicture 
+							? @" class=""actionelement""" 
+							: string.Empty, 
+						"showproduct.aspx.19".StringResource(), 
+						hasProductPicture 
+							? string.Format(@"onClick=""{0}""", scriptPopup) 
+							: string.Empty, 
+						ProductPicture, 
+						AltText.Replace("\"", "&quot;"));
                 }
                 else
                 {
-                    tmpS.Append("<img id=\"ProductPic" + VariantID.ToString() + "\" name=\"" + CommonLogic.IIF(AppLogic.AppConfigBool("NameImagesBySEName") && !String.IsNullOrEmpty(seName), seName, "ProductPic" + VariantID.ToString()) + "\" src=\"" + ProductPicture + "\" alt=\"" + AltText.Replace("\"", "&quot;") + "\" />");
+					string.Format(
+						@"<img id=""ProductPic{0}"" name=""{1}"" src=""{2}"" alt=""{3}"" />", 
+						VariantID, 
+						AppLogic.AppConfigBool("NameImagesBySEName") && !String.IsNullOrEmpty(seName)
+							? seName
+							: string.Format("ProductPic{0}", VariantID), 
+						ProductPicture, 
+						AltText.Replace("\"", "&quot;"));
                 }
-                if (HasLargePic)
+				if(HasLargePic && hasProductPicture)
                 {
-                    tmpS.Append("<img src=\"" + AppLogic.LocateImageURL("images/spacer.gif") + "\" width=\"1\" height=\"4\" />");
-                    tmpS.Append("<div class=\"pop-large-wrap\"><a href=\"javascript:void(0);\" class=\"pop-large-link\" onClick=\"" + scriptPopup + "\"><img src=\"" + AppLogic.LocateImageURL("App_Themes/skin_" + ThisCustomer.SkinID.ToString() + "/images/showlarger.gif") + "\" title=\"" + "showproduct.aspx.19".StringResource() + "\"></a></div>");
+					tmpS.AppendFormat(@"<img src=""{0}"" width=""1"" height=""4"" />", AppLogic.LocateImageURL("images/spacer.gif"));
+					tmpS.AppendFormat(
+						@"<div class=""pop-large-wrap""><a href=""javascript:void(0);"" class=""pop-large-link"" onClick=""{0}""><img src=""{1}"" title=""{2}""></a></div>", 
+						scriptPopup, 
+						AppLogic.LocateImageURL(string.Format("App_Themes/skin_{0}/images/showlarger.gif", ThisCustomer.SkinID)), 
+						"showproduct.aspx.19".StringResource());
                 }
                 tmpS.Append("</div>");
                 result = tmpS.ToString();
@@ -2248,7 +2461,7 @@ function popupzoom(url,alturl)
                 NumProducts = AppLogic.LookupHelper(EntityName, 0).GetNumEntityObjects(EntityID, true, true);
                 if (NumProducts > 1)
                 {
-                    int PreviousProductID = AppLogic.GetProductSequence("previous", ProductID, EntityID, EntityName, 0, SortByLooks, true, true, ThisCustomer, out SEName);
+                    int PreviousProductID = AppLogic.GetProductSequence("previous", ProductID, EntityID, EntityName, 0, SortByLooks, true, ThisCustomer, out SEName);
                     if (UseGraphics)
                     {
                         tmpS.Append("<a class=\"ProductNavLink\" href=\"" + SE.MakeProductAndEntityLink(EntityName, PreviousProductID, EntityID, SEName) + "\"><img src=\"" + AppLogic.LocateImageURL("App_Themes/skin_" + ThisCustomer.SkinID.ToString() + "/images/previous.gif", ThisCustomer.LocaleSetting) + "\" alt=\"" + AppLogic.GetString("image.altText.1", ThisCustomer.SkinID, ThisCustomer.LocaleSetting) + "\"></a>");
@@ -2271,7 +2484,7 @@ function popupzoom(url,alturl)
                 }
                 if (NumProducts > 1)
                 {
-                    int NextProductID = AppLogic.GetProductSequence("next", ProductID, EntityID, EntityName, 0, SortByLooks, true, true, ThisCustomer, out SEName);
+                    int NextProductID = AppLogic.GetProductSequence("next", ProductID, EntityID, EntityName, 0, SortByLooks, true, ThisCustomer, out SEName);
                     if (UseGraphics)
                     {
                         tmpS.Append("<a class=\"ProductNavLink\" href=\"" + SE.MakeProductAndEntityLink(EntityName, NextProductID, EntityID, SEName) + "\"><img src=\"" + AppLogic.LocateImageURL("App_Themes/skin_" + ThisCustomer.SkinID.ToString() + "/images/next.gif", ThisCustomer.LocaleSetting) + "\" alt=\"" + AppLogic.GetString("image.altText.2", ThisCustomer.SkinID, ThisCustomer.LocaleSetting) + "\"></a>");

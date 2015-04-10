@@ -34,7 +34,7 @@ namespace AspDotNetStorefrontGateways.Processors
         {
             get
             {
-				return "(also enables PayPal Express Checkout) - See <a href='http://www.aspdotnetstorefront.com/linkmanager.aspx?topic=9500manual&type=paypalpayflowpro' target='_blank'>Manual</a>.";
+				return "(also enables PayPal Express Checkout) - See <a href='http://www.aspdotnetstorefront.com/linkmanager.aspx?topic=9510manual&type=paypalpayflowpro' target='_blank'>Manual</a>.";
             }
         }
 

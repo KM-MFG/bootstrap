@@ -110,7 +110,7 @@ namespace AspDotNetStorefrontAdmin
 						return;
 					}
 
-					txtSerial.Text = Server.HtmlEncode(DB.RSField(rs, "SerialNumber"));
+					txtSerial.Text = DB.RSField(rs, "SerialNumber");
 					int gcCustomerId = DB.RSFieldInt(rs, "PurchasedByCustomerID");
 					ltCustomerID.Text = gcCustomerId.ToString();
 
@@ -124,7 +124,7 @@ namespace AspDotNetStorefrontAdmin
 						ltCustomerEmail.Text = AppLogic.GetString("admin.editgiftcard.NACustomer", SkinID, LocaleSetting);
 					}
 
-					txtOrder.Text = Server.HtmlEncode(DB.RSFieldInt(rs, "OrderNumber").ToString());
+					txtOrder.Text = DB.RSFieldInt(rs, "OrderNumber").ToString();
 					txtDate.SelectedDate = DB.RSFieldDateTime(rs, "ExpirationDate");
 
 					txtAmount.Text = Localization.CurrencyStringForDBWithoutExchangeRate(DB.RSFieldDecimal(rs, "InitialAmount"));

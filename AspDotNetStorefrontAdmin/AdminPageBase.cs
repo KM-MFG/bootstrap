@@ -17,13 +17,6 @@ namespace AspDotNetStorefrontAdmin
     /// </summary>
     public class AdminPageBase : System.Web.UI.Page
     {
-        public enum ImportOption
-        {
-            Default = 0,
-            LeaveModified = 1,
-            OverWrite = 2
-        }
-
         #region Private Variables
         private String m_ErrorMsg = String.Empty;
         private int m_skinID = 1;

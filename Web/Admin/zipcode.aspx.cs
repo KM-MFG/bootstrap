@@ -107,7 +107,7 @@ namespace AspDotNetStorefrontAdmin
 		{
 			using(SqlConnection dbconn = new SqlConnection(DB.GetDBConn()))
 			{
-				StringBuilder sql = new StringBuilder("SELECT TaxClassID, Name FROM TaxClass ORDER BY TaxClassID");
+				StringBuilder sql = new StringBuilder(string.Format("SELECT TaxClassID, dbo.GetMlValue(Name, '{0}') as Name FROM TaxClass ORDER BY TaxClassID", Localization.GetDefaultLocale()));
 
 				dbconn.Open();
 				using(IDataReader rs = DB.GetRS(sql.ToString(), dbconn))

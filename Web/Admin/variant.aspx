@@ -411,18 +411,10 @@
 							<table class="table table-detail">
 								<tr>
 									<td>
-										<asp:Literal ID="ltDescription" runat="Server" />
-										<telerik:radeditor runat="server" id="radDescription">
-											<ImageManager UploadPaths="~/Images" ViewPaths="~/Images" DeletePaths="~/Images" />
-											<DocumentManager UploadPaths="~/Images" ViewPaths="~/Images" DeletePaths="~/Images" />
-											<FlashManager UploadPaths="~/Images" ViewPaths="~/Images" DeletePaths="~/Images" />
-											<MediaManager UploadPaths="~/Images" ViewPaths="~/Images" DeletePaths="~/Images" />
-											<SilverlightManager UploadPaths="~/Images" ViewPaths="~/Images" DeletePaths="~/Images" />
-											<TemplateManager UploadPaths="~/Images" ViewPaths="~/Images" DeletePaths="~/Images" />
-											<Modules>
-												<telerik:EditorModule Name="RadEditorToolZone" Enabled="false" Visible="false" />
-											</Modules>
-										</telerik:radeditor>
+										<div class="form-group">
+											<asp:TextBox ID="txtDescriptionNoHtmlEditor" Rows="15" TextMode="MultiLine" runat="server" Visible="false" CssClass="form-control" />
+										</div>
+										<telerik:radeditor runat="server" id="radDescription" SkinID="RadEditorSettings" />
 									</td>
 								</tr>
 							</table>
@@ -439,9 +431,7 @@
 								<tr>
 									<td>
 										<div class="form-group">
-											<div class="col-sm-6">
-												<asp:TextBox CssClass="form-control multiExtension" ID="txtFroogle" runat="Server" TextMode="multiLine" />
-											</div>
+											<asp:TextBox CssClass="form-control multiExtension" ID="txtFroogle" runat="Server" TextMode="multiLine" />
 										</div>
 									</td>
 								</tr>
@@ -560,7 +550,7 @@
 							<asp:Image runat="server" ID="imgPayPal" ImageUrl="Images/PayPal_PaymentsAccepted.gif" />
 						</div>
 						<div class="admin-row">
-							<asp:HyperLink Text="Get help with recurring products" NavigateUrl="http://www.aspdotnetstorefront.com/linkmanager.aspx?topic=9500manual&type=recurringvariant" Target="_blank" runat="server" ID="HyperLink1" />
+							<asp:HyperLink Text="Get help with recurring products" NavigateUrl="http://www.aspdotnetstorefront.com/linkmanager.aspx?topic=9510manual&type=recurringvariant" Target="_blank" runat="server" ID="HyperLink1" />
 						</div>
 						<div class="admin-row" runat="server" id="trRecurring">
 							<div class="col-sm-3">

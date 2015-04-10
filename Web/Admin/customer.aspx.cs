@@ -328,7 +328,7 @@ namespace AspDotNetStorefrontAdmin
 			if (customer.DateOfBirth > DateTime.MinValue)
 				txtDOB.SelectedDate = customer.DateOfBirth;
 			txtMicroPay.Text = Localization.ParseNativeCurrency(customer.MicroPayBalance.ToString()).ToString();
-			txtNotes.Text = Security.HtmlEncode(customer.Notes);
+			txtNotes.Text = customer.Notes;
 
 			chkAccountLocked.Checked = customer.LockedUntil > System.DateTime.Now;
 			chkOver13.Checked = customer.IsOver13;

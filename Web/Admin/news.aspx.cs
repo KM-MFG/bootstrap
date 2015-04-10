@@ -5,7 +5,6 @@
 // THE ABOVE NOTICE MUST REMAIN INTACT. 
 // --------------------------------------------------------------------------------
 using System;
-using System.Collections.Generic;
 using System.Data.SqlClient;
 using System.Web.UI.WebControls;
 using AspDotNetStorefrontControls;
@@ -13,61 +12,61 @@ using AspDotNetStorefrontCore;
 
 namespace AspDotNetStorefrontAdmin
 {
-
 	public partial class News : AdminPageBase
 	{
 		public const string PublishNewsCommand = "news:publish";
 		public const string UnpublishNewsCommand = "news:unpublish";
-		readonly Dictionary<string, CommandEventHandler> CommandHandlerMappings;
+		public const string DeleteNewsCommand = "news:delete";
 
-		protected void Page_Load(object sender, EventArgs e)
+		protected void DispatchCommand(object sender, GridViewCommandEventArgs e)
 		{
-			Response.CacheControl = "private";
-			Response.Expires = 0;
-			Response.AddHeader("pragma", "no-cache");
+			if(e.CommandName == PublishNewsCommand)
+				PublishNewsCommandHandler(e, true);
+			else if(e.CommandName == UnpublishNewsCommand)
+				PublishNewsCommandHandler(e, false);
+			else if(e.CommandName == DeleteNewsCommand)
+				DeleteNewsCommandHandler(e);
 		}
 
-		public News()
-		{
-			// Use a dictionary to map the string command names to handler methods
-			CommandHandlerMappings = new Dictionary<string, CommandEventHandler>
-			{
-				{ PublishNewsCommand, (o, e) => PublishNewsCommandHandler(o, e, true) },
-				{ UnpublishNewsCommand, (o, e) => PublishNewsCommandHandler(o, e, false) }
-			};
-		}
-
-		protected void DispatchCommand(object sender, CommandEventArgs e)
-		{
-			// Dispatch known command names out of the dictionary
-			if(CommandHandlerMappings.ContainsKey(e.CommandName))
-				CommandHandlerMappings[e.CommandName].Invoke(sender, e);
-		}
-
-		void PublishNewsCommandHandler(object sender, CommandEventArgs e, bool published)
+		void PublishNewsCommandHandler(CommandEventArgs e, bool published)
 		{
 			int newsId;
 			if(!Int32.TryParse((string)e.CommandArgument, out newsId))
 				return;
 
-			if(SetPublishedFlag(newsId, published))
-			{
-				ctrlAlertMessage.PushAlertMessage("News Article Updated", AlertMessage.AlertType.Success);
-
-				FilteredListing.Rebind();
-			}
+			if(SetNewsFlags(newsId, published: published))
+				ctrlAlertMessage.PushAlertMessage(
+					String.Format(
+						"News {0}",
+						published
+							? "published"
+							: "unpublished"),
+					AlertMessage.AlertType.Success);
 		}
 
-		bool SetPublishedFlag(int newsId, bool published)
+		void DeleteNewsCommandHandler(CommandEventArgs e)
+		{
+			int newsId;
+			if(!Int32.TryParse((string)e.CommandArgument, out newsId))
+				return;
+
+			if(SetNewsFlags(newsId, deleted: true))
+				ctrlAlertMessage.PushAlertMessage("News deleted", AlertMessage.AlertType.Success);
+		}
+
+		bool SetNewsFlags(int newsId, bool? published = null, bool? deleted = null)
 		{
 			try
 			{
 				DB.ExecuteSQL(
-					"update dbo.News set Published = @Published where NewsId = @NewsId",
+					@"update dbo.News 
+					set Published = coalesce(@published, Published), Deleted = coalesce(@deleted, Deleted) 
+					where NewsId = @newsId",
 					new[]
 					{
-						new SqlParameter("Published", published),
-						new SqlParameter("NewsId", newsId),
+						new SqlParameter("published", (object)published ?? DBNull.Value),
+						new SqlParameter("deleted", (object)deleted ?? DBNull.Value),
+						new SqlParameter("newsId", newsId),
 					});
 
 				return true;
@@ -76,36 +75,6 @@ namespace AspDotNetStorefrontAdmin
 			{
 				SysLog.LogException(ex, MessageTypeEnum.DatabaseException, MessageSeverityEnum.Error);
 				return false;
-			}
-		}
-
-		protected void gMain_RowDataBound(object sender, GridViewRowEventArgs e)
-		{
-			if(e.Row.RowType == DataControlRowType.DataRow)
-			{
-				LinkButton lnkDelete = (LinkButton)e.Row.FindControl("lnkDelete");
-				lnkDelete.Attributes.Add("onClick", "javascript: return confirm('Are you sure you want to delete this news article?')");
-			}
-		}
-
-		protected void gMain_RowCommand(object sender, GridViewCommandEventArgs e)
-		{
-			if(e.CommandName == "DeleteItem")
-			{
-				gMain.EditIndex = -1;
-				int iden = Localization.ParseNativeInt(e.CommandArgument.ToString());
-
-				try
-				{
-					DB.ExecuteSQL(String.Format("UPDATE News SET Deleted = 1 WHERE NewsID = {0}", iden));
-					ctrlAlertMessage.PushAlertMessage("Deleted", AlertMessage.AlertType.Success);
-
-					FilteredListing.Rebind();
-				}
-				catch(Exception ex)
-				{
-					ctrlAlertMessage.PushAlertMessage(ex.Message, AlertMessage.AlertType.Error);
-				}
 			}
 		}
 	}

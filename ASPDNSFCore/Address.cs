@@ -2149,7 +2149,6 @@ namespace AspDotNetStorefrontCore
         {
             StringBuilder tmpS = new StringBuilder(1000);
 
-            tmpS.Append("<script type=\"text/javascript\" language=\"Javascript\" src=\"jscripts/tooltip.js\" /></script> ");
             tmpS.Append("<div class='form card-form'>");
             // Credit Card fields
 
@@ -2216,7 +2215,8 @@ namespace AspDotNetStorefrontCore
                     tmpS.Append("(<a id=\"aCardCodeToolTip\" href=\"javascript:void(0);\" style=\"cursor: normal;\" >" + AppLogic.GetString("address.cs.50", m_SkinID, m_LocaleSetting) + "</a>)");
                     tmpS.Append("<script type=\"text/javascript\" language=\"Javascript\">");
                     tmpS.Append(" $window_addLoad(function() { { new ToolTip('aCardCodeToolTip', 'CardCodeTooltip', '<iframe width=400 height=370 frameborder=0 marginheight=2 marginwidth=2 scrolling=no src=" + AppLogic.LocateImageURL("App_Themes/skin_" + m_SkinID.ToString() + "/images/verificationnumber.gif") + "></iframe>'); } }) ");
-                    tmpS.Append("</script>");
+					tmpS.Append("</script>");
+					tmpS.Append("<script type=\"text/javascript\" language=\"Javascript\" src=\"jscripts/tooltip.js\" /></script> ");
                     if (Validate)
                     {
                         tmpS.Append("        <input type=\"hidden\" name=\"CardExtraCode_vldt\" value=\"" + CommonLogic.IIF(!AppLogic.AppConfigBool("CardExtraCodeIsOptional"), "[req]", "") + "[len=3][blankalert=" + AppLogic.GetString("address.cs.29", m_SkinID, m_LocaleSetting) + "][invalidalert=" + AppLogic.GetString("address.cs.30", m_SkinID, m_LocaleSetting) + "]\">\n");
@@ -2541,58 +2541,6 @@ namespace AspDotNetStorefrontCore
 
             tmpS.Append("	  <div class='form-text'>" + String.Format(AppLogic.GetString("address.cs.48", m_SkinID, m_LocaleSetting), AppLogic.LocateImageURL("App_Themes/skin_" + m_SkinID.ToString() + "/images/check_micr.gif")) + "</div>");
             tmpS.Append("</div>");
-            return tmpS.ToString();
-        }
-
-        /// <summary>
-        /// Gets the  address select list.
-        /// </summary>
-        /// <param name="ThisCustomer">The this customer.</param>
-        /// <param name="RenamePrimary">if set to <c>true</c> [rename primary].</param>
-        /// <param name="SelectName">Name of the select.</param>
-        /// <param name="AddPrimary">if set to <c>true</c> [add primary].</param>
-        /// <param name="NumNonDefaultFound">The number of non default found.</param>
-        /// <returns></returns>
-        static public String StaticGetAddressSelectList(Customer ThisCustomer, bool RenamePrimary, String SelectName, bool AddPrimary, out int NumNonDefaultFound)
-        {
-            StringBuilder tmpS = new StringBuilder(4096);
-            NumNonDefaultFound = 0;
-            tmpS.Append("<select class=\"form-control\" name=\"" + SelectName + "\" id=\"" + SelectName + "\">\n");
-            if (AddPrimary)
-            {
-                if (ThisCustomer.PrimaryShippingAddressID != 0)
-                {
-                    String nm = AppLogic.GetString("address.cs.51", ThisCustomer.SkinID, ThisCustomer.LocaleSetting);
-                    tmpS.Append("<option value=\"" + ThisCustomer.PrimaryShippingAddressID.ToString() + "\">" + HttpContext.Current.Server.HtmlEncode(nm) + "</option>");
-                }
-                if (ThisCustomer.PrimaryBillingAddressID != 0 && ThisCustomer.PrimaryBillingAddressID != ThisCustomer.PrimaryShippingAddressID)
-                {
-                    String nm = AppLogic.GetString("address.cs.52", ThisCustomer.SkinID, ThisCustomer.LocaleSetting);
-                    tmpS.Append("<option value=\"" + ThisCustomer.PrimaryBillingAddressID.ToString() + "\">" + HttpContext.Current.Server.HtmlEncode(nm) + "</option>");
-                }
-            }
-            String sql = "select * from Address  with (NOLOCK)  where CustomerID=" + ThisCustomer.CustomerID.ToString() + " and AddressID not in (" + ThisCustomer.PrimaryBillingAddressID.ToString() + "," + ThisCustomer.PrimaryShippingAddressID.ToString() + ") order by nickname, firstname, lastname";
-
-            using (SqlConnection dbconn = DB.dbConn())
-            {
-                dbconn.Open();
-                using (IDataReader rs = DB.GetRS(sql, dbconn))
-                {
-                    while (rs.Read())
-                    {
-                        int addrID = DB.RSFieldInt(rs, "AddressID");
-                        NumNonDefaultFound++; // tick non-primary counter
-                        String nm = DB.RSField(rs, "NickName");
-                        if (nm.Length == 0)
-                        {
-                            nm = (DB.RSField(rs, "FirstName") + " " + DB.RSField(rs, "LastName")).Trim();
-                        }
-                        tmpS.Append("<option value=\"" + addrID.ToString() + "\">" + HttpContext.Current.Server.HtmlEncode(nm) + "</option>");
-                    }
-                }
-            }
-
-            tmpS.Append("</select>\n");
             return tmpS.ToString();
         }
     }

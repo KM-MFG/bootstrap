@@ -120,8 +120,8 @@ namespace AspDotNetStorefrontAdmin
 
 		private List<InventoryItem> GetSizeColorCombos(ProductVariant variant)
 		{
-			string sizes = variant.Sizes ?? string.Empty;
-			string colors = variant.Colors ?? string.Empty;
+			string sizes = XmlCommon.GetLocaleEntry(variant.Sizes, Localization.GetDefaultLocale(), true) ?? string.Empty;
+			string colors = XmlCommon.GetLocaleEntry(variant.Colors, Localization.GetDefaultLocale(), true) ?? string.Empty;
 
 			string[] sizesList = sizes.Split(',');
 			string[] colorsList = colors.Split(',');

@@ -5,162 +5,74 @@
 // THE ABOVE NOTICE MUST REMAIN INTACT. 
 // --------------------------------------------------------------------------------
 using System;
+using System.Data;
+using System.Data.SqlClient;
 using System.Web.UI.WebControls;
-using System.Xml;
+using AspDotNetStorefrontControls;
 using AspDotNetStorefrontCore;
 
 namespace AspDotNetStorefrontAdmin
 {
-    /// <summary>
-    /// Summary description for displayorder.
-    /// </summary>
-    public partial class entityBulkDisplayOrder : AdminPageBase
-    {
-        private string entityName;
-        private int eID;
-        private EntitySpecs eSpecs;
-        private XmlDocument EntityXml;
-        private string EntityPlural;
+	public partial class EntityBulkDisplayOrder : AdminPageBase
+	{
+		string entityType;
 
-        protected void Page_Load(object sender, EventArgs e)
-        {
-            eID = CommonLogic.QueryStringNativeInt("EntityID");
-			entityName = CommonLogic.QueryStringCanBeDangerousContent("EntityName");
-			eSpecs = EntityDefinitions.LookupSpecs(entityName);
-			btnBackToEntityEdit.Text = entityName + " Management";
-
-			switch(entityName.ToUpperInvariant())
-            {
-                case "SECTION":
-                    ViewState["entityname"] = "Section";
-                    EntityPlural = "Sections";
-                    break;
-                case "MANUFACTURER":
-                    ViewState["entityname"] = "Manufacturer";
-                    EntityPlural = "Manufacturers";
-                    break;
-                case "DISTRIBUTOR":
-                    ViewState["entityname"] = "Distributor";
-                    EntityPlural = "Distributors";
-                    break;
-                case "GENRE":
-                    ViewState["entityname"] = "Genre";
-                    EntityPlural = "Genres";
-                    break;
-                case "VECTOR":
-                    ViewState["entityname"] = "Vector";
-                    EntityPlural = "Vectors";
-                    break;
-                case "LIBRARY":
-                    ViewState["entityname"] = "Library";
-                    EntityPlural = "Libraries";
-                    break;
-                default:
-                    ViewState["entityname"] = "Category";
-                    EntityPlural = "Categories";
-                    break;
-            }
-
-            if (eID == 0)
-            {
-                lblpagehdr.Text = "Set " + ViewState["entityname"].ToString() + " Display Order";
-                lblpagehdr.Visible = true;
-            }
-            else
-            {
-                lblpagehdr.Visible = false;
-            }
-
-            if (!IsPostBack)
-            {
-                EntityXml = new EntityHelper(0, eSpecs, !AppLogic.IsAdminSite, 0).m_TblMgr.XmlDoc;
-                LoadBody();
-            }
-        }
-
-        private void LoadBody()
-        {
-
-            XmlNodeList nodelist = EntityXml.SelectNodes("//Entity[ParentEntityID=" + eID.ToString() + "]");
-            subcategories.DataSource = nodelist;
-            subcategories.DataBind();
-
-            if (nodelist.Count > 0)
-            {
-                pnlNoSubEntities.Visible = false;
-                pnlSubEntityList.Visible = true;
-            }
-            else
-            {
-                lblError.Text = "This " + ViewState["entityname"].ToString() + " has no sub-" + EntityPlural;
-            }
-
-        }
-
-
-        protected void UpdateDisplayOrder(object sender, EventArgs e)
-        {
-            foreach (RepeaterItem ri in subcategories.Items)
-            {
-                TextBox d = (TextBox)ri.FindControl("DisplayOrder");
-                TextBox eid = (TextBox)ri.FindControl("entityid");
-
-                string displayorder = CommonLogic.IIF(CommonLogic.IsInteger(d.Text), d.Text, "1");
-                DB.ExecuteSQL("update " + ViewState["entityname"].ToString() + " set displayorder = " + displayorder + " where " + ViewState["entityname"].ToString() + "ID = " + eid.Text);
-            }
-
-            //refresh the static entityhelper
-            switch (ViewState["entityname"].ToString().ToUpperInvariant())
-            {
-                case "CATEGORY":
-                    AppLogic.CategoryStoreEntityHelper[0] = new EntityHelper(0, EntityDefinitions.LookupSpecs("Category"), true, 0);
-                    EntityXml = new EntityHelper(0, EntityDefinitions.LookupSpecs("Category"), false, 0).m_TblMgr.XmlDoc;
-
-                    break;
-                case "SECTION":
-                    AppLogic.SectionStoreEntityHelper[0] = new EntityHelper(0, EntityDefinitions.LookupSpecs("Section"), true, 0);
-                    EntityXml = new EntityHelper(0, EntityDefinitions.LookupSpecs("Section"), false, 0).m_TblMgr.XmlDoc;
-                    break;
-                case "MANUFACTURER":
-                    AppLogic.ManufacturerStoreEntityHelper[0] = new EntityHelper(0, EntityDefinitions.LookupSpecs("Manufacturer"), true, 0);
-                    EntityXml = new EntityHelper(0, EntityDefinitions.LookupSpecs("Manufacturer"), false, 0).m_TblMgr.XmlDoc;
-                    break;
-                case "DISTRIBUTOR":
-                    AppLogic.DistributorStoreEntityHelper[0] = new EntityHelper(0, EntityDefinitions.LookupSpecs("Distributor"), true, 0);
-                    EntityXml = new EntityHelper(0, EntityDefinitions.LookupSpecs("Distributor"), false, 0).m_TblMgr.XmlDoc;
-                    break;
-                case "GENRE":
-                    AppLogic.GenreStoreEntityHelper[0] = new EntityHelper(0, EntityDefinitions.LookupSpecs("Genre"), true, 0);
-                    EntityXml = new EntityHelper(0, EntityDefinitions.LookupSpecs("Genre"), false, 0).m_TblMgr.XmlDoc;
-                    break;
-                case "VECTOR":
-                    AppLogic.VectorStoreEntityHelper[0] = new EntityHelper(0, EntityDefinitions.LookupSpecs("Vector"), true, 0);
-                    EntityXml = new EntityHelper(0, EntityDefinitions.LookupSpecs("Genre"), false, 0).m_TblMgr.XmlDoc;
-                    break;
-                case "LIBRARY":
-                    AppLogic.LibraryStoreEntityHelper[0] = new EntityHelper(0, EntityDefinitions.LookupSpecs("Library"), true, 0);
-                    EntityXml = new EntityHelper(0, EntityDefinitions.LookupSpecs("Library"), false, 0).m_TblMgr.XmlDoc;
-                    break;
-            }
-
-            LoadBody();
-        }
-
-        public string getLocaleValue(XmlNode n, string locale)
-        {
-            XmlNode xn = n.SelectSingleNode(".//locale[@name='" + locale + "']");
-            if (xn != null)
-            {
-                return xn.InnerText;
-            }
-            else
-            {
-                return n.InnerText;
-            }
-        }
-		protected void btnBackToEntityEdit_Click(object sender, EventArgs e)
+		protected void Page_Load(object sender, EventArgs e)
 		{
-			Response.Redirect("entities.aspx?entityname=" + entityName);
+			entityType = ddEntityType.SelectedValue;
+
+			if(!Page.IsPostBack)
+				grdDisplayOrder.DataBind();
 		}
-}
+
+		protected void grdDisplayOrder_DataBinding(object sender, EventArgs e)
+		{
+			using(var dbconn = new SqlConnection(DB.GetDBConn()))
+			{
+				var sql = string.Format("SELECT '{0}' AS EntityType, {0}ID AS EntityId, dbo.GetMlValue(Name, '{1}') AS Name, DisplayOrder FROM {0} WHERE Parent{0}ID = 0 ORDER BY DisplayOrder, Name",
+										entityType,
+										LocaleSetting);
+
+				dbconn.Open();
+				using(var rs = DB.GetRS(sql, dbconn))
+				using(var dt = new DataTable())
+				{
+					dt.Load(rs);
+					grdDisplayOrder.DataSource = dt;
+				}
+			}
+		}
+
+		protected void ddEntityType_SelectedIndexChanged(object sender, EventArgs e)
+		{
+			grdDisplayOrder.DataBind();
+		}
+
+		protected void UpdateDisplayOrder(object sender, EventArgs e)
+		{
+			try
+			{
+				foreach(GridViewRow row in grdDisplayOrder.Rows)
+				{
+					var entityId = grdDisplayOrder.DataKeys[row.DataItemIndex].Value;
+
+					var txtDisplayOrder = (TextBox)row.FindControl("txtDisplayOrder");
+					var litEntityId = (Literal)row.FindControl("litEntityId");
+
+					int displayOrderVal;
+
+					if(int.TryParse(txtDisplayOrder.Text, out displayOrderVal))
+						DB.ExecuteSQL(String.Format("UPDATE {0} SET DisplayOrder = {1} WHERE {0}ID = {2}", entityType, displayOrderVal, entityId));
+				}
+
+				AlertMessageDisplay.PushAlertMessage("admin.orderdetails.UpdateSuccessful".StringResource(), AlertMessage.AlertType.Success);
+			}
+			catch(Exception exception)
+			{
+				AlertMessageDisplay.PushAlertMessage(exception.Message, AlertMessage.AlertType.Error);
+			}
+
+			grdDisplayOrder.DataBind();
+		}
+	}
 }

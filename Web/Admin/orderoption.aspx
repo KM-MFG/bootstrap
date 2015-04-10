@@ -12,10 +12,12 @@
 		</h1>
 		<aspdnsf:AlertMessage ID="ctlAlertMessage" runat="server" />
 		<div class="item-action-bar">
-			<asp:Panel ID="pnlLocale" Visible="false" runat="server" Style="float: left; margin-right: 5px;">
-				<asp:Label runat="server" Text="<%$Tokens:StringResource, admin.stringresources.Locale %>" AssociatedControlID="ddLocales" />
-				<asp:DropDownList ID="ddLocales" runat="server" AutoPostBack="true" OnSelectedIndexChanged="ddLocales_SelectedIndexChanged" />
-			</asp:Panel>
+			<div class="other-actions">
+				<asp:Panel ID="pnlLocale" runat="server" Visible='<%# LocaleSelector.HasMultipleLocales() %>'>
+					<asp:Label runat="server" Text="<%$Tokens:StringResource, admin.stringresources.Locale %>" AssociatedControlID="LocaleSelector" />
+					<aspdnsf:LocaleSelector ID="LocaleSelector" runat="server" OnSelectedLocaleChanged="LocaleSelector_SelectedLocaleChanged" />
+				</asp:Panel>
+			</div>
 			<asp:HyperLink ID="btnCloseTop" runat="server" CssClass="btn btn-default" NavigateUrl="<%# ReturnUrlTracker.GetHyperlinkReturnUrl() %>" Text="<%$Tokens:StringResource, admin.common.close %>" />
 			<asp:Button ID="btnSaveAndCloseTop" runat="server" CssClass="btn btn-default" OnClick="btnSaveAndClose_Click" ValidationGroup="gAdd" Text="<%$Tokens:StringResource, admin.common.SaveAndClose %>" />
 			<asp:Button ID="btnSubmitTop" runat="server" CssClass="btn btn-primary" OnClick="btnSubmit_Click" ValidationGroup="gAdd" Text="<%$Tokens:StringResource, admin.common.Save %>" />
@@ -36,17 +38,7 @@
 						<div class="form-group">
 							<asp:Label runat="server" Text="<%$Tokens:StringResource, admin.common.Description %>" />
 							<asp:TextBox ID="txtDescription" runat="server" Visible="false" TextMode="MultiLine" Rows="10" />
-							<telerik:RadEditor id="radCopy" runat="server">
-								<ImageManager UploadPaths="~/Images" ViewPaths="~/Images" DeletePaths="~/Images" />
-								<DocumentManager UploadPaths="~/Images" ViewPaths="~/Images" DeletePaths="~/Images" />
-								<FlashManager UploadPaths="~/Images" ViewPaths="~/Images" DeletePaths="~/Images" />
-								<MediaManager UploadPaths="~/Images" ViewPaths="~/Images" DeletePaths="~/Images" />
-								<SilverlightManager UploadPaths="~/Images" ViewPaths="~/Images" DeletePaths="~/Images" />
-								<TemplateManager UploadPaths="~/Images" ViewPaths="~/Images" DeletePaths="~/Images" />
-								<Modules>
-									<telerik:EditorModule Name="RadEditorToolZone" Enabled="false" Visible="false" />
-								</Modules>
-							</telerik:RadEditor>
+							<telerik:RadEditor id="radCopy" runat="server" SkinID="RadEditorSettings" />
 						</div>
 						<div class="form-group">
 							<span class="text-danger">*</span><asp:Label AssociatedControlID="txtCost" for="txtCost" runat="server" Text="<%$Tokens:StringResource, admin.common.Cost %>" />:

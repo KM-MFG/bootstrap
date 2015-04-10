@@ -22,9 +22,10 @@ namespace AspDotNetStorefrontControls.Listing
 
 		protected override void OnInit(EventArgs e)
 		{
+			this.Visible = AppLogic.NumLocaleSettingsInstalled() > 1;
+
 			if(!Page.IsPostBack)
 			{
-				this.Visible = AppLogic.NumLocaleSettingsInstalled() > 1;
 				Value.DataSource = ValueDataSource;
 				Value.DataBind();
 			}

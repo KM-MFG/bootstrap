@@ -2,7 +2,7 @@
 $('.js-help-button').click(function (event) {
 	var helpBox = $('.js-help-box');
 	if(helpBox.val().length > 0) {
-		var helpUrl = 'http://help.aspdotnetstorefront.com/manual/95/default.aspx?pageid=_search_&searchtext=' + helpBox.val();
+		var helpUrl = 'http://help.aspdotnetstorefront.com/manual/951/default.aspx?pageid=_search_&searchtext=' + helpBox.val();
 		window.open(helpUrl);
 	}
 	else {

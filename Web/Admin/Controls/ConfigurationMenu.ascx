@@ -16,6 +16,8 @@
 							<asp:Literal runat="server" Text="<%$Tokens:StringResource, admin.menu.stores %>" /></a></li>
 						<li><a href="storemappings.aspx">
 							<asp:Literal runat="server" Text="<%$Tokens:StringResource, admin.menu.storemappings %>" /></a></li>
+						<li><a href="entitybulkdisplayorder.aspx">
+							<asp:Literal runat="server" Text="<%$Tokens:StringResource, admin.menu.DisplayOrder %>" /></a></li>
 						<li>
 							<span class="config-menu-header">
 								<asp:Literal runat="server" Text="<%$Tokens:StringResource, admin.menu.taxes %>" />
@@ -93,7 +95,7 @@
 							<ul>
 								<li><a href="about.aspx">
 									<asp:Literal runat="server" Text="<%$Tokens:StringResource, admin.menu.about %>" /></a></li>
-								<li><a href="http://www.aspdotnetstorefront.com/linkmanager.aspx?topic=9500manual&type=landingpage" target="_blank">
+								<li><a href="http://www.aspdotnetstorefront.com/linkmanager.aspx?topic=9510manual&type=landingpage" target="_blank">
 									<asp:Literal runat="server" Text="<%$Tokens:StringResource, admin.menu.OnlineManual %>" /></a></li>
 							</ul>
 						</li>

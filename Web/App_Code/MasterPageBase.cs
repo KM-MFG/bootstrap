@@ -5,24 +5,10 @@
 // THE ABOVE NOTICE MUST REMAIN INTACT. 
 // --------------------------------------------------------------------------------
 using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Configuration;
-using System.Data;
-using System.Linq;
 using System.Web;
-using System.Web.Security;
 using System.Web.UI;
 using System.Web.UI.WebControls;
-using System.Web.UI.WebControls.WebParts;
-using System.Web.UI.HtmlControls;
-using System.ComponentModel;
-using System.Xml.Linq;
-using System.Data.SqlClient;
-using System.Threading;
-using System.Text;
 using AspDotNetStorefrontCore;
-using AspDotNetStorefrontControls;
 
 namespace AspDotNetStorefront
 {
@@ -138,12 +124,22 @@ namespace AspDotNetStorefront
                 (this.Page as SkinBase).RegisterScriptAndServices(scrptMgr);                
             }
             Page.ClientScript.RegisterClientScriptInclude(Page.GetType(), "formvalidate", ResolveClientUrl("~/jscripts/formvalidate.js"));
-            Page.ClientScript.RegisterClientScriptInclude(Page.GetType(), "core", ResolveClientUrl("~/jscripts/core.js"));
-            
-            LoadMiniCartIfEnabled();
+			Page.ClientScript.RegisterClientScriptInclude(Page.GetType(), "core", ResolveClientUrl("~/jscripts/core.js"));
+
+			LoadMiniCartIfEnabled();
+
+			var pageContent = this.FindControl("PageContent") as ContentPlaceHolder;
+
+			//Add the session timer to the page if the user is logged in or checking out
+			if(AppLogic.AppConfigBool("SessionTimeoutWarning.Enabled")
+				&& (ThisCustomer.IsRegistered 
+					|| (Request.Url.AbsoluteUri.IndexOf("checkout", StringComparison.OrdinalIgnoreCase) != -1)))
+			{
+				Control sessionTimerControl = LoadControl("~/Controls/SessionTimer.ascx") as Control;
+				pageContent.Controls.Add(sessionTimerControl);
+			}
 
 			// dynamically add the preview control to the page
-			var pageContent = this.FindControl("PageContent") as ContentPlaceHolder;
 			var profile = HttpContext.Current.Profile;
 			if(pageContent != null 
                 && profile != null

@@ -8,116 +8,198 @@
 <%@ Register TagPrefix="aspdnsf" TagName="DataQueryFilter" Src="Controls/Listing/DataQueryFilter.ascx" %>
 
 <asp:Content runat="server" ContentPlaceHolderID="bodyContentPlaceholder">
-	<aspdnsf:AlertMessage ID="AlertMessage" runat="server" />
-	<h1><i class="fa fa-pencil-square-o"></i>
+	<h1>
+		<i class="fa fa-pencil-square-o"></i>
 		<asp:Literal runat="server" Text="<%$ Tokens:StringResource, admin.stringresources.StringResources %>" />
 	</h1>
 
-	<div class="list-action-bar">
-		<asp:Panel ID="pnlLocale" Visible="false" runat="server" Style="float: left; margin-right: 5px;">
-			<asp:Label runat="server" Text="<%$Tokens:StringResource, admin.stringresources.Locale %>" AssociatedControlID="ddLocales" />
-			<asp:DropDownList ID="ddLocales" runat="server" AutoPostBack="true" />
-		</asp:Panel>
-		<asp:Button runat="server" ID="btnLoadExcelServer" CssClass="btn btn-default" Text="<%$ Tokens:StringResource, admin.stringresources.ReloadFromExcelOnServer %>" OnClick="btnLoadExcelServer_Click" />
-		<asp:Button runat="server" ID="btnUploadExcel" CssClass="btn btn-default" Text="<%$ Tokens:StringResource, admin.stringresources.ReloadFromExcelOnPC %>" OnClick="btnUploadExcel_Click" />
-		<asp:Button runat="server" ID="btnShowMissing" CssClass="btn btn-default" Text="<%$ Tokens:StringResource, admin.stringresources.ShowMissing %>" OnClick="btnShowMissing_Click" />
-		<asp:Button runat="server" ID="btnClearLocale" CssClass="btn btn-default" Text="<%$ Tokens:StringResource, admin.stringresources.ClearLocale %>" OnClick="btnClearLocale_Click" />
-		<asp:HyperLink runat="server" CssClass="btn btn-action" Text="<%$ Tokens:StringResource, admin.stringresources.AddNewString %>" NavigateUrl="stringresource.aspx" />
-	</div>
+	<aspdnsf:AlertMessage runat="server" ID="AlertMessage" />
 
 	<aspdnsf:FilteredListing runat="server"
 		ID="FilteredListing"
-		SortExpression="Name">
+		SqlQuery="
+			select {0} 
+				StringResource.StringResourceID,
+				StringResource.Name,
+				StringResource.ConfigValue,
+				case when StringResource.Modified = 1 then 'Yes' else 'No' end [Modified],
+				StringResource.StoreID,
+				coalesce(LocaleSetting.Description, StringResource.LocaleSetting) [LocaleSetting],
+				Store.Name [StoreName]
+			from
+				StringResource with (NOLOCK)
+				left join Store on Store.StoreID = StringResource.StoreID 
+				left join LocaleSetting on LocaleSetting.Name = StringResource.LocaleSetting
+			where {1}"
+		SortExpression="StringResource.Name">
+		<ActionBarTemplate>
+
+			<asp:Panel ID="pnlLocale" Visible="false" runat="server" CssClass="other-actions">
+				<asp:Label runat="server" Text="<%$Tokens:StringResource, admin.stringresources.Locale %>" AssociatedControlID="ddLocales" />
+				<asp:DropDownList ID="ddLocales" runat="server" AutoPostBack="true" />
+			</asp:Panel>
+
+			<span class="dropdown">
+				<button class="btn btn-default dropdown-toggle" type="button" data-toggle="dropdown" aria-expanded="true">
+					<asp:Literal runat="server" Text="<%$ Tokens:StringResource, admin.stringresources.ReloadFromExcelOnServer %>" />
+					<span class="caret"></span>
+				</button>
+				<ul class="dropdown-menu dropdown-menu-right" role="menu">
+					<asp:Repeater runat="server" DataSource="<%# LocaleSource.Locales.Where(locale => StringResourceManager.CheckStringResourceExcelFileExists(locale.Name)) %>">
+						<ItemTemplate>
+							<li role="presentation">
+								<a href='<%# String.Format("ImportStringResourceFile1.aspx?showlocalesetting={0}&master=true", Eval("Name")) %>'>
+									<%# Eval("Description") %>
+								</a>
+							</li>
+						</ItemTemplate>
+					</asp:Repeater>
+				</ul>
+			</span>
+
+			<span class="dropdown">
+				<button class="btn btn-default dropdown-toggle" type="button" data-toggle="dropdown" aria-expanded="true">
+					<asp:Literal runat="server" Text="<%$ Tokens:StringResource, admin.stringresources.ReloadFromExcelOnPC %>" />
+					<span class="caret"></span>
+				</button>
+				<ul class="dropdown-menu dropdown-menu-right" role="menu">
+					<asp:Repeater runat="server" DataSource="<%# LocaleSource.Locales %>">
+						<ItemTemplate>
+							<li role="presentation">
+								<a href='<%# String.Format("ImportStringResourceFile1.aspx?showlocalesetting={0}", Eval("Name")) %>'>
+									<%# Eval("Description") %>
+								</a>
+							</li>
+						</ItemTemplate>
+					</asp:Repeater>
+				</ul>
+			</span>
+
+			<span runat="server" class="dropdown" visible='<%# LocaleSource.HasMultipleLocales() %>'>
+				<button class="btn btn-default dropdown-toggle" type="button" data-toggle="dropdown" aria-expanded="true">
+					<asp:Literal runat="server" Text="<%$ Tokens:StringResource, admin.stringresources.ShowMissing %>" />
+					<span class="caret"></span>
+				</button>
+				<ul class="dropdown-menu dropdown-menu-right" role="menu">
+					<asp:Repeater runat="server" DataSource="<%# LocaleSource.Locales %>">
+						<ItemTemplate>
+							<li role="presentation">
+								<a href='<%# String.Format("StringResourceRpt.aspx?reporttype=missing&ShowLocaleSetting={0}", Eval("Name")) %>'>
+									<%# Eval("Description") %>
+								</a>
+							</li>
+						</ItemTemplate>
+					</asp:Repeater>
+				</ul>
+			</span>
+
+			<span runat="server" class="dropdown" visible='<%# LocaleSource.HasMultipleLocales() %>'>
+				<button class="btn btn-default dropdown-toggle" type="button" data-toggle="dropdown" aria-expanded="true">
+					<asp:Literal runat="server" Text="<%$ Tokens:StringResource, admin.stringresources.ClearLocale %>" />
+					<span class="caret"></span>
+				</button>
+				<ul class="dropdown-menu dropdown-menu-right" role="menu">
+					<asp:Repeater runat="server" DataSource="<%# LocaleSource.Locales %>">
+						<ItemTemplate>
+							<li role="presentation">
+								<asp:LinkButton runat="server"
+									class="js-confirm-delete"
+									data-locale='<%# Eval("Name") %>'
+									CommandName="<%# ClearLocalCommand %>"
+									CommandArgument='<%# Eval("Name") %>'
+									OnCommand="ClearLocaleLink_Command"
+									Text='<%# Eval("Description") %>' />
+							</li>
+						</ItemTemplate>
+					</asp:Repeater>
+				</ul>
+			</span>
+
+			<asp:HyperLink runat="server" CssClass="btn btn-action" Text="<%$ Tokens:StringResource, admin.stringresources.AddNewString %>" NavigateUrl="stringresource.aspx" />
+		</ActionBarTemplate>
 		<Filters>
 			<aspdnsf:StringFilter runat="server"
 				Label="Name"
-				FieldName="Name" />
+				FieldName="StringResource.Name" />
 			<aspdnsf:StringFilter runat="server"
 				Label="Value"
-				FieldName="ConfigValue" />
+				FieldName="StringResource.ConfigValue" />
 			<aspdnsf:DataQueryFilter runat="server"
 				Label="Locale"
-				FieldName="LocaleSetting"
-				DataQuery="select Name from LocaleSetting with (NOLOCK) order by DisplayOrder, Description"
+				FieldName="StringResource.LocaleSetting"
+				DataQuery="select Name, Description from LocaleSetting with (NOLOCK) order by DisplayOrder, Description"
+				DataTextField="Description"
 				DataValueField="Name"
 				QueryStringNames="filterlocale" />
 			<aspdnsf:DataQueryFilter runat="server"
 				Label="<%$Tokens:StringResource, admin.order.ForStore %>"
-				FieldName="StoreId"
+				FieldName="StringResource.StoreId"
 				DataQuery="select StoreId, Name from Store"
 				DataTextField="Name"
 				DataValueField="StoreId" />
 			<aspdnsf:BooleanFilter runat="server"
 				Label="Modified"
-				FieldName="Modified" />
+				FieldName="StringResource.Modified" />
 		</Filters>
 		<ListingTemplate>
 			<div class="white-ui-box">
-				<asp:GridView CssClass="table js-sortable-gridview" ID="gMain" runat="server"
+				<asp:GridView runat="server"
+					ID="gMain"
+					CssClass="table js-sortable-gridview"
 					DataSourceID="FilteredListingDataSource"
-					PagerSettings-Position="TopAndBottom"
 					AutoGenerateColumns="False"
 					OnRowCommand="gMain_RowCommand"
-					BorderStyle="None"
-					BorderWidth="0px"
-					CellPadding="0"
-					GridLines="None"
-					CellSpacing="-1"
-					ShowFooter="True"
 					DataKeyNames="StringResourceID"
-					AllowSorting="true">
+					AllowSorting="true"
+					GridLines="None">
 					<EmptyDataTemplate>
 						<div class="alert alert-info">
 							<asp:Literal runat="server" Text="<%$ Tokens:StringResource, admin.common.EmptyDataTemplate.NoResults %>" />
 						</div>
 					</EmptyDataTemplate>
 					<Columns>
-						<asp:TemplateField SortExpression="StringResourceID" HeaderText="ID">
-							<ItemTemplate>
-								<asp:Literal runat="server" Text='<%# DataBinder.Eval(Container.DataItem, "StringResourceID") %>' />
-							</ItemTemplate>
-							<ItemStyle Width="5%" />
-						</asp:TemplateField>
 
-						<asp:TemplateField SortExpression="Name" HeaderText="Name">
-							<ItemTemplate>
-								<asp:HyperLink runat="server" NavigateUrl='<%# Eval("StringResourceID", "stringresource.aspx?stringid={0}")%>'>
-									<%# CreateLinkText(DataBinder.Eval(Container.DataItem, "Name")) %>
-								</asp:HyperLink>
-							</ItemTemplate>
-						</asp:TemplateField>
+						<asp:BoundField
+							HeaderText="ID"
+							HeaderStyle-Width="5%"
+							SortExpression="StringResource.StringResourceID"
+							DataField="StringResourceID" />
 
-						<asp:TemplateField SortExpression="ConfigValue" HeaderText="Value">
-							<ItemTemplate>
-								<asp:Literal runat="server" Text='<%# DataBinder.Eval(Container.DataItem, "ConfigValue") %>' />
-							</ItemTemplate>
-						</asp:TemplateField>
+						<asp:HyperLinkField
+							HeaderText="Name"
+							SortExpression="StringResource.Name"
+							DataNavigateUrlFields="StringResourceID"
+							DataNavigateUrlFormatString="stringresource.aspx?stringid={0}"
+							DataTextField="Name"
+							Text="<%$Tokens:StringResource, admin.nolinktext %>" />
 
-						<asp:TemplateField HeaderText="Modified">
-							<ItemTemplate>
-								<asp:Literal runat="server" Text='<%# DataBinder.Eval(Container.DataItem, "Modified").ToString() == "1" ? "Yes" : "No" %>' />
-							</ItemTemplate>
-						</asp:TemplateField>
+						<asp:BoundField
+							HeaderText="Value"
+							SortExpression="StringResource.ConfigValue"
+							DataField="ConfigValue" />
 
-						<asp:TemplateField HeaderText="Store Id">
-							<ItemTemplate>
-								<asp:Literal runat="server" Text='<%# DataBinder.Eval(Container.DataItem, "StoreID") %>' />
-							</ItemTemplate>
-						</asp:TemplateField>
+						<asp:BoundField
+							HeaderText="Modified"
+							DataField="Modified" />
 
-						<asp:TemplateField HeaderText="Locale">
-							<ItemTemplate>
-								<asp:Literal runat="server" Text='<%# DataBinder.Eval(Container.DataItem, "LocaleSetting") %>' />
-							</ItemTemplate>
-						</asp:TemplateField>
+						<asp:BoundField
+							HeaderText="Store"
+							DataField="StoreName" />
 
-						<asp:TemplateField HeaderText="Delete">
+						<asp:BoundField
+							HeaderText="Locale"
+							DataField="LocaleSetting" />
+
+						<asp:TemplateField
+							HeaderStyle-Width="5%">
 							<ItemTemplate>
-								<asp:LinkButton ID="Delete" ToolTip="Delete" CssClass="delete-link fa-times" CommandName="DeleteItem" CommandArgument='<%# Eval("StringResourceID") %>' runat="Server">
-									<asp:Literal runat="server" Text="<%$Tokens:StringResource, admin.common.Delete %>" />
-								</asp:LinkButton>
+								<asp:LinkButton runat="Server"
+									CssClass="delete-link fa-times"
+									ToolTip="Delete"
+									CommandName="<%# DeleteCommand %>"
+									CommandArgument='<%# Eval("StringResourceID") %>'
+									Text="<%$Tokens:StringResource, admin.common.Delete %>" />
 							</ItemTemplate>
-							<ItemStyle Width="5%" />
 						</asp:TemplateField>
 
 					</Columns>
@@ -125,4 +207,13 @@
 			</div>
 		</ListingTemplate>
 	</aspdnsf:FilteredListing>
+
+	<script>
+		$('.js-confirm-delete').click(function(e) {
+			var locale = $(this).data('locale');
+			var prompt = 'Are you sure you want to delete all prompts in the ' + locale + ' locale from the database?'
+			if(!confirm(prompt))
+				e.preventDefault();
+		});
+	</script>
 </asp:Content>

@@ -10,6 +10,7 @@ using System.ComponentModel;
 using System.Data;
 using System.Data.SqlClient;
 using System.Linq;
+using System.Text;
 using System.Web.UI;
 using System.Web.UI.WebControls;
 using AspDotNetStorefrontCore;
@@ -235,7 +236,9 @@ namespace AspDotNetStorefrontControls.Listing
 
 			EffectiveDisplayLocale = Page.Request.QueryString["locale.selection"] ?? CurrentCustomerLocale;
 
-			EffectiveSortExpression = SelectedSortExpression ?? SortExpression;
+			EffectiveSortExpression = String.IsNullOrWhiteSpace(SelectedSortExpression)
+				? SortExpression
+				: Encoding.UTF8.GetString(Convert.FromBase64String(SelectedSortExpression));
 
 			EffectiveSortDirection = SelectedSortDirection ?? SortDirection;
 
@@ -427,7 +430,7 @@ namespace AspDotNetStorefrontControls.Listing
 		public override void RenderBeginTag(HtmlTextWriter writer)
 		{
 			if(!String.IsNullOrEmpty(SortExpression))
-				writer.AddAttribute("data-sorting-default-expression", SortExpression);
+				writer.AddAttribute("data-sorting-default-expression", Convert.ToBase64String(Encoding.UTF8.GetBytes(SortExpression)));
 
 			writer.AddAttribute("data-sorting-default-direction", SortDirection.ToString().ToLower());
 

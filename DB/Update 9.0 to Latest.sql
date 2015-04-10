@@ -23,6 +23,57 @@
 SET NOCOUNT ON
 GO
 
+SET NOEXEC OFF
+GO
+
+DECLARE @oldGateway NVARCHAR(MAX), @gatewayType NVARCHAR(MAX), @storeId INT, @abortScript BIT
+DECLARE @removedGateways TABLE (Name NVARCHAR(MAX), GatewayType NVARCHAR(MAX), StoreId INT)
+
+INSERT INTO @removedGateways (Name, GatewayType, StoreId)
+	SELECT ConfigValue, Name, StoreId 
+	FROM AppConfig 
+	WHERE (Name = 'PaymentGateway' OR Name = 'PaymentGatewayBackup') 
+		AND ConfigValue NOT IN ('','authorizenet','cybersource','eprocessingnetwork','firstpay','manual','moneris','payflowpro','paypal','qbmerchantservices','sagepayments','sagepayuk','securenetv4','skipjack','twocheckout','usaepay')
+
+IF EXISTS (SELECT * FROM @removedGateways)
+BEGIN
+
+	SET @abortScript = 1
+
+	PRINT '!!WARNING!!'
+	PRINT 'Your site is configured to use a gateway that is no longer supported so the upgrade process is aborting.'
+	PRINT 'The PaymentGateway and/or PaymentGatewayBackup AppConfigs will need to be set to a gateway that is still supported'
+	PRINT 'or ''MANUAL'' to allow the upgrade to continue.  You will need to obtain a new gateway account and configure it before'
+	PRINT 'continuing.  Supported gateways are listed in the latest manual.'
+	PRINT ''
+	PRINT 'Any pending transactions placed under the old gateway should be fully processed before upgrading.'
+	PRINT ''
+	PRINT 'Contact support at https://support.aspdotnetstorefront.com/ with any questions about this process.'
+	PRINT ''
+
+	DECLARE gateway_cursor CURSOR FOR SELECT * FROM @removedGateways
+	OPEN gateway_cursor
+	FETCH NEXT FROM gateway_cursor INTO @oldGateway, @gatewayType, @storeId
+
+	WHILE @@FETCH_STATUS = 0
+	BEGIN
+		Print '     Store ' 
+			+ CAST(@storeId AS NVARCHAR(MAX)) 
+			+ ' uses ' 
+			+ @oldGateway 
+			+ ' as the ' 
+			+ CASE 
+				WHEN @gatewayType = 'PaymentGateway' THEN 'payment gateway.'
+				ELSE 'backup payment gateway.'
+				END
+
+		FETCH NEXT FROM gateway_cursor INTO @oldGateway, @gatewayType, @storeId
+	END
+END
+
+IF @abortScript = 1
+	SET NOEXEC ON	--Don't run the rest of the script until the gateway issue is resolved
+
 PRINT '*****Database Upgrade Started*****'
 
 /* ************************************************************** */
@@ -110,114 +161,6 @@ BEGIN
 
 END
 
-
-GO
-
-
-IF EXISTS (select * from dbo.sysobjects where id = object_id(N'[dbo].aspdnsf_GetShoppingCart') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
-    drop proc [dbo].[aspdnsf_GetShoppingCart]
-GO
-create proc [dbo].[aspdnsf_GetShoppingCart]
-    @CartType tinyint, -- ShoppingCart = 0, WishCart = 1, RecurringCart = 2
-    @CustomerID int,
-    @OriginalRecurringOrderNumber int,
-    @OnlyLoadRecurringItemsThatAreDue tinyint,
-    @StoreID int = 1
-
-
-AS
-BEGIN
-
-    SET NOCOUNT ON
-    declare @filtershoppingcart bit, @filterproduct bit
-    SELECT TOP 1 @filtershoppingcart = ConfigValue FROM GlobalConfig WHERE Name='AllowShoppingcartFiltering'
-    SELECT TOP 1 @filterproduct = ConfigValue FROM GlobalConfig WHERE Name='AllowProductFiltering'
-
-    SELECT
-        ShoppingCart.ProductSKU,
-        ShoppingCart.IsUpsell,
-        ShoppingCart.Notes,
-        ShoppingCart.ExtensionData,
-        ShoppingCart.CustomerEntersPrice,
-        ShoppingCart.NextRecurringShipDate,
-        ShoppingCart.RecurringIndex,
-        ShoppingCart.OriginalRecurringOrderNumber,
-        ShoppingCart.RecurringSubscriptionID,
-        ShoppingCart.CartType,
-        ShoppingCart.ProductPrice,
-        ShoppingCart.ProductWeight,
-        ShoppingCart.ProductDimensions,
-        ShoppingCart.ShoppingCartRecID,
-        ShoppingCart.ProductID,
-        ShoppingCart.VariantID,
-        ShoppingCart.Quantity,
-        ShoppingCart.IsTaxable,
-        ShoppingCart.TaxClassID,
-        ShoppingCart.TaxRate,
-        ShoppingCart.IsShipSeparately,
-        ShoppingCart.ChosenColor,
-        ShoppingCart.ChosenColorSKUModifier,
-        ShoppingCart.ChosenSize,
-        ShoppingCart.ChosenSizeSKUModifier,
-        ShoppingCart.TextOption,
-        ShoppingCart.IsDownload,
-        ShoppingCart.FreeShipping,
-        ShoppingCart.DistributorID,
-        ShoppingCart.DownloadLocation,
-        ShoppingCart.CreatedOn,
-        ShoppingCart.BillingAddressID as ShoppingCartBillingAddressID,
-        ShoppingCart.ShippingAddressID as ShoppingCartShippingAddressID,
-        ShoppingCart.ShippingMethodID,
-        ShoppingCart.ShippingMethod,
-        ShoppingCart.RequiresCount,
-        ShoppingCart.IsSystem,
-        ShoppingCart.IsAKit,
-        ShoppingCart.IsAPack,
-        Customer.EMail,
-        Customer.OrderOptions,
-        Customer.OrderNotes,
-        Customer.FinalizationData,
-        Customer.CouponCode,
-        Customer.ShippingAddressID as
-        CustomerShippingAddressID,
-        Customer.BillingAddressID as CustomerBillingAddressID,
-        Product.Name as ProductName,
-        Product.IsSystem,
-        ProductVariant.name as VariantName,
-        Product.TextOptionPrompt,
-        Product.SizeOptionPrompt,
-        Product.ColorOptionPrompt,
-        ProductVariant.CustomerEntersPricePrompt,
-        Product.ProductTypeId,
-        Product.TaxClassId,
-        Product.ManufacturerPartNumber,
-        Product.ImageFileNameOverride,
-        Product.SEName,
-        Product.Deleted,
-        ProductVariant.Weight,
-        case @CartType when 2 then ShoppingCart.RecurringInterval else productvariant.RecurringInterval end RecurringInterval,
-        case @CartType when 2 then ShoppingCart.RecurringIntervalType else productvariant.RecurringIntervalType end RecurringIntervalType
-
-    FROM dbo.Customer with (NOLOCK)
-        join dbo.ShoppingCart with (NOLOCK) ON Customer.CustomerID = ShoppingCart.CustomerID
-        join dbo.Product with (NOLOCK) on ShoppingCart.ProductID=Product.ProductID
-        left join dbo.ProductVariant with (NOLOCK) on ShoppingCart.VariantID=ProductVariant.VariantID
-        left join dbo.Address with (NOLOCK) on Customer.ShippingAddressID=Address.AddressID
-        left join dbo.country c on c.name = Address.country
-        left join dbo.State with (nolock) ON Address.State = State.Abbreviation and State.countryid = c.countryid
-		inner join (select distinct a.ProductID,a.StoreID from ShoppingCart a with (nolock) left join ProductStore b with (nolock) on a.ProductID = b.ProductID where (@filterproduct = 0 or a.StoreID = b.StoreID)) productstore
-        on ShoppingCart.ProductID = productstore.ProductID and ShoppingCart.StoreID = productstore.StoreID
-
-    WHERE ShoppingCart.CartType = @CartType
-        and Product.Deleted in (0,2)
-        and ProductVariant.Deleted = 0
-        and Customer.customerid = @CustomerID
-        and (@OriginalRecurringOrderNumber = 0 or ShoppingCart.OriginalRecurringOrderNumber = @OriginalRecurringOrderNumber)
-        and (@OnlyLoadRecurringItemsThatAreDue = 0 or (@CartType = 2 and NextRecurringShipDate < dateadd(dy, 1, getdate())))
-        and (@filtershoppingcart = 0 or ShoppingCart.StoreID = @StoreID)
-     ORDER BY ShoppingCart.ShippingAddressID
-
-END
 
 GO
 
@@ -1343,55 +1286,6 @@ begin
 		and ConfigValue = 'DeprecatedOPC'
 end
 go
-
-ALTER PROC [dbo].[aspdnsf_GetCustomerByEmail]
-    @Email nvarchar(100),
-    @filtercustomer bit,
-    @StoreID int = 1,
-    @AdminOnly bit = 0
-AS
-BEGIN
-    SET NOCOUNT ON
-
-    DECLARE @CustomerSessionID int, @LastActivity datetime, @SessionTimeOut varchar(10), @intSessionTimeOut int
-
-    SELECT @LastActivity = '1/1/1900', @CustomerSessionID = -1
-
-    SELECT @SessionTimeOut = ConfigValue FROM dbo.AppConfig with (nolock) WHERE [Name] = 'SessionTimeoutInMinutes'
-
-    IF ISNUMERIC(@SessionTimeOut) = 1
-        set @intSessionTimeOut = convert(int, @SessionTimeOut)
-    ELSE
-        set @intSessionTimeOut = 60
-
-    SELECT  @CustomerSessionID  = cs.CustomerSessionID , @LastActivity = cs.LastActivity
-    FROM dbo.CustomerSession cs with (nolock)
-        join (SELECT max(CustomerSessionID) CustomerSessionID
-              FROM dbo.CustomerSession s with (nolock) join dbo.Customer c with (nolock) on s.CustomerID = c.CustomerID
-              WHERE c.Email = @Email and s.LoggedOut is null and s.LastActivity >= dateadd(mi, -@intSessionTimeOut, getdate())) a on cs.CustomerSessionID = a.CustomerSessionID
-
-    SELECT top 1
-            c.CustomerID, c.CustomerGUID, c.CustomerLevelID, c.RegisterDate, c.Email, c.Password, c.SaltKey, c.DateOfBirth, c.Gender,
-            c.FirstName, c.LastName, c.Notes, c.SkinID, c.Phone, c.AffiliateID, c.Referrer, c.CouponCode, c.OkToEmail,
-            IsAdmin&1 IsAdmin, sign(IsAdmin&2) IsSuperAdmin, c.BillingEqualsShipping, c.LastIPAddress,
-            c.OrderNotes, c.RTShipRequest, c.RTShipResponse, c.OrderOptions, c.LocaleSetting,
-            c.MicroPayBalance, c.RecurringShippingMethodID, c.RecurringShippingMethod, c.BillingAddressID, c.ShippingAddressID,
-            c.CODCompanyCheckAllowed, c.CODNet30Allowed, c.ExtensionData,
-            c.FinalizationData, c.Deleted, c.CreatedOn, c.Over13Checked, c.CurrencySetting,
-            case when isnull(cl.CustomerLevelID, 0) > 0 and cl.LevelHasNoTax = 1 then 2 else c.VATSetting end VATSetting,
-            c.VATRegistrationID, c.StoreCCInDB, c.IsRegistered, c.LockedUntil, c.AdminCanViewCC, c.PwdChanged, c.BadLoginCount,
-            c.LastBadLogin, c.Active, c.PwdChangeRequired, c.SaltKey, isnull(cl.LevelDiscountPercent, 0) LevelDiscountPercent,
-            isnull(cl.LevelDiscountsApplyToExtendedPrices, 0) LevelDiscountsApplyToExtendedPrices, c.RequestedPaymentMethod,
-            @CustomerSessionID CustomerSessionID, @LastActivity LastActivity, c.StoreID, d.Name StoreName
-    FROM dbo.Customer c with (nolock) left join dbo.CustomerLevel cl with (nolock) on c.CustomerLevelID = cl.CustomerLevelID
-    left join Store d with (nolock) on c.StoreID = d.StoreID
-    WHERE c.Deleted=0
-		and c.Email = @Email
-		and ((@filtercustomer = 0 or IsAdmin > 0) or c.StoreID = @StoreID)
-		and (@AdminOnly = 0 or c.IsAdmin > 0)
-    ORDER BY c.IsRegistered desc, c.CreatedOn desc
-END
-GO
 
 IF NOT EXISTS (SELECT * FROM [GlobalConfig] WHERE [Name] = 'Anonymous.AllowAlreadyRegisteredEmail') BEGIN
 	INSERT GlobalConfig([Name], [GroupName], [Description], [ConfigValue], [ValueType], [IsMultiStore]) VALUES('Anonymous.AllowAlreadyRegisteredEmail', 'DISPLAY', 'If true anonymous users will be able to checkout with email addresses that are already in use. If AllowCustomerDuplicateEMailAddresses is true this has no effect.', 'false', 'boolean', 'false')
@@ -3004,116 +2898,6 @@ SET NOCOUNT ON
 	SET @NewShoppingCartRecID = @ShoppingCartrecid
 GO
 
-
-IF  EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[aspdnsf_GetShoppingCart]') AND type in (N'P', N'PC'))
-	DROP PROCEDURE [dbo].[aspdnsf_GetShoppingCart]
-GO
-
-create proc [dbo].[aspdnsf_GetShoppingCart]
-    @CartType tinyint, -- ShoppingCart = 0, WishCart = 1, RecurringCart = 2
-    @CustomerID int,
-    @OriginalRecurringOrderNumber int,
-    @OnlyLoadRecurringItemsThatAreDue tinyint,
-    @StoreID int = 1
-
-
-AS
-BEGIN
-
-    SET NOCOUNT ON
-    declare @filtershoppingcart bit, @filterproduct bit
-    SELECT TOP 1 @filtershoppingcart = ConfigValue FROM GlobalConfig WHERE Name='AllowShoppingcartFiltering'
-    SELECT TOP 1 @filterproduct = ConfigValue FROM GlobalConfig WHERE Name='AllowProductFiltering'
-
-    SELECT
-        ShoppingCart.ProductSKU,
-        ShoppingCart.IsUpsell,
-        ShoppingCart.Notes,
-        ShoppingCart.ExtensionData,
-        ShoppingCart.CustomerEntersPrice,
-        ShoppingCart.NextRecurringShipDate,
-        ShoppingCart.RecurringIndex,
-        ShoppingCart.OriginalRecurringOrderNumber,
-        ShoppingCart.RecurringSubscriptionID,
-        ShoppingCart.CartType,
-        ShoppingCart.ProductPrice,
-        ShoppingCart.ProductWeight,
-        ShoppingCart.ProductDimensions,
-        ShoppingCart.ShoppingCartRecID,
-        ShoppingCart.ProductID,
-        ShoppingCart.VariantID,
-        ShoppingCart.Quantity,
-        ShoppingCart.IsTaxable,
-        ShoppingCart.TaxClassID,
-        ShoppingCart.TaxRate,
-        ShoppingCart.IsShipSeparately,
-        ShoppingCart.ChosenColor,
-        ShoppingCart.ChosenColorSKUModifier,
-        ShoppingCart.ChosenSize,
-        ShoppingCart.ChosenSizeSKUModifier,
-        ShoppingCart.TextOption,
-        ShoppingCart.IsDownload,
-        ShoppingCart.FreeShipping,
-        ShoppingCart.DistributorID,
-        ShoppingCart.DownloadLocation,
-        ShoppingCart.CreatedOn,
-        ShoppingCart.BillingAddressID as ShoppingCartBillingAddressID,
-        ShoppingCart.ShippingAddressID as ShoppingCartShippingAddressID,
-        ShoppingCart.ShippingMethodID,
-        ShoppingCart.ShippingMethod,
-        ShoppingCart.RequiresCount,
-        ShoppingCart.IsSystem,
-        ShoppingCart.IsAKit,
-        ShoppingCart.IsAPack,
-        ShoppingCart.IsGift,
-        Customer.EMail,
-        Customer.OrderOptions,
-        Customer.OrderNotes,
-        Customer.FinalizationData,
-        Customer.CouponCode,
-        Customer.ShippingAddressID as
-        CustomerShippingAddressID,
-        Customer.BillingAddressID as CustomerBillingAddressID,
-        Product.Name as ProductName,
-        Product.IsSystem,
-        ProductVariant.name as VariantName,
-        Product.TextOptionPrompt,
-        Product.SizeOptionPrompt,
-        Product.ColorOptionPrompt,
-        ProductVariant.CustomerEntersPricePrompt,
-        Product.ProductTypeId,
-        Product.TaxClassId,
-        Product.ManufacturerPartNumber,
-        Product.ImageFileNameOverride,
-        Product.SEName,
-        Product.Deleted,
-        ProductVariant.Weight,
-        case @CartType when 2 then ShoppingCart.RecurringInterval else productvariant.RecurringInterval end RecurringInterval,
-        case @CartType when 2 then ShoppingCart.RecurringIntervalType else productvariant.RecurringIntervalType end RecurringIntervalType
-
-    FROM dbo.Customer with (NOLOCK)
-        join dbo.ShoppingCart with (NOLOCK) ON Customer.CustomerID = ShoppingCart.CustomerID
-        join dbo.Product with (NOLOCK) on ShoppingCart.ProductID=Product.ProductID
-        left join dbo.ProductVariant with (NOLOCK) on ShoppingCart.VariantID=ProductVariant.VariantID
-        left join dbo.Address with (NOLOCK) on Customer.ShippingAddressID=Address.AddressID
-        left join dbo.country c on c.name = Address.country
-        left join dbo.State with (nolock) ON Address.State = State.Abbreviation and State.countryid = c.countryid
-		inner join (select distinct a.ProductID,a.StoreID from ShoppingCart a with (nolock) left join ProductStore b with (nolock) on a.ProductID = b.ProductID where (@filterproduct = 0 or a.StoreID = b.StoreID)) productstore
-        on ShoppingCart.ProductID = productstore.ProductID and ShoppingCart.StoreID = productstore.StoreID
-
-    WHERE ShoppingCart.CartType = @CartType
-        and Product.Deleted in (0,2)
-        and ProductVariant.Deleted = 0
-        and Customer.customerid = @CustomerID
-        and (@OriginalRecurringOrderNumber = 0 or ShoppingCart.OriginalRecurringOrderNumber = @OriginalRecurringOrderNumber)
-        and (@OnlyLoadRecurringItemsThatAreDue = 0 or (@CartType = 2 and NextRecurringShipDate < dateadd(dy, 1, getdate())))
-        and (@filtershoppingcart = 0 or ShoppingCart.StoreID = @StoreID)
-     ORDER BY ShoppingCart.ShippingAddressID
-
-END
-
-GO
-
 if not exists (select * from AppConfig where Name = 'Debug.DisplayOrderSummaryDiagnostics')
 	Insert Into AppConfig (Name, [Description], GroupName, ConfigValue, ValueType, AllowableValues)
 		Values ('Debug.DisplayOrderSummaryDiagnostics' ,'Displays diagnostic subtotals in the order summary.','DEBUG', 'false','boolean', null);
@@ -3471,6 +3255,12 @@ if not exists(select * from AppConfig Where Name='GoogleTrustedStoreEnabled')
 if not exists(select * from AppConfig Where Name='GoogleTrustedStoreShippingLeadTime')
 	INSERT INTO AppConfig (AppConfigGUID, StoreID, Name, Description, ConfigValue, ValueType, AllowableValues, GroupName, SuperOnly, Hidden, CreatedOn)
 	VALUES(newid(), 0, 'GoogleTrustedStoreShippingLeadTime', 'Average estimated number of days before a new order ships (whole numbers only).  Be as accurate as possible without shorting this value - this factors into your store''s trust rating.', '', 'integer', null, 'Google Trusted Store', 0, 0, getdate());
+if not exists(select * from AppConfig Where Name='GoogleTrustedStoreDeliveryLeadTime')
+	INSERT INTO AppConfig (AppConfigGUID, StoreID, Name, Description, ConfigValue, ValueType, AllowableValues, GroupName, SuperOnly, Hidden, CreatedOn)
+	VALUES(newid(), 0, 'GoogleTrustedStoreDeliveryLeadTime', 'The estimated average number of days before an order is delivered (whole numbers only).  Be as accurate as possible without shorting this value - this factors into your store''s trust rating.', '', 'integer', null, 'GOOGLE TRUSTED STORE', 0, 0, getdate());
+if not exists(select * from AppConfig Where Name='GoogleTrustedStoreBadgePosition')
+	INSERT INTO AppConfig (AppConfigGUID, StoreID, Name, Description, ConfigValue, ValueType, AllowableValues, GroupName, SuperOnly, Hidden, CreatedOn)
+	VALUES(newid(), 0, 'GoogleTrustedStoreBadgePosition', 'Where to place the Google Trusted Store badge on your site - bottom left, or bottom right.', 'BOTTOM_RIGHT', 'enum', 'BOTTOM_RIGHT,BOTTOM_LEFT', 'GOOGLE TRUSTED STORE', 0, 0, getdate());
 /*********************Google Trusted Stores Integration ********************/
 
 /*********************UpdatedOn and CreatedOn Columns & DB Triggers************************/
@@ -8594,216 +8384,6 @@ update [dbo].[AppConfig] set [Description] = 'Zip Code restrictions for the stor
 update [dbo].[AppConfig] set [Description] = 'Zone restrictions for the store-pickup option if the restriction type is zone.  This should be a list of zone IDs from the Shipping->Shipping Zones Page.' where [Name] = 'RTShipping.LocalPickupRestrictionZones'
 GO
 
-IF EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID('dbo.aspdnsf_GetCustomersRelatedProducts') AND type IN ( N'P', N'PC' ) )
-	begin
-	 DROP PROCEDURE dbo.aspdnsf_GetCustomersRelatedProducts;
-	end
-GO
--- Added info for Schema.org attributes
-CREATE PROCEDURE [dbo].[aspdnsf_GetCustomersRelatedProducts]
-	@CustomerViewID		NVARCHAR(50),
-	@ProductID			INT,
-	@CustomerLevelID	INT,
-	@InvFilter			INT,
-	@affiliateID		INT,
-	@storeID			INT = 1,
-	@filterProduct		BIT = 0
-
-AS
-SET NOCOUNT ON
-
-DECLARE
-	   @custlevelcount INT,
-	   @CustomerLevelFilteringIsAscending BIT,
-	   @FilterProductsByCustomerLevel TINYINT,
-	   @relatedprods VARCHAR(8000),
-	   @DynamicProductsEnabled VARCHAR(10),
-	   @ProductsDisplayed INT,
-	   @FilterProductsByAffiliate TINYINT,
-	   @affiliatecount INT,
-	   @AffiliateExists INT
-
-SELECT @custlevelcount = si.rows FROM dbo.sysobjects so WITH (NOLOCK) JOIN dbo.sysindexes si WITH (NOLOCK) ON so.id = si.id WHERE so.id = OBJECT_ID('ProductCustomerLevel') and si.indid < 2 AND type = 'u'
-SELECT @FilterProductsByCustomerLevel = CASE ConfigValue WHEN 'true' THEN 1 ELSE 0 END FROM dbo.AppConfig WITH (NOLOCK) WHERE [Name] = 'FilterProductsByCustomerLevel'
-SELECT @FilterProductsByAffiliate = CASE ConfigValue WHEN 'true' THEN 1 ELSE 0 END FROM dbo.AppConfig WITH (NOLOCK) WHERE [Name] = 'FilterProductsByAffiliate'
-SELECT @affiliatecount = COUNT(*),  @AffiliateExists = SUM(CASE WHEN AffiliateID = @affiliateID THEN 1 ELSE 0 END) FROM dbo.ProductAffiliate WITH (NOLOCK) WHERE ProductID = @ProductID
-
-   SET @CustomerLevelFilteringIsAscending  = 0
-SELECT @CustomerLevelFilteringIsAscending  = CASE configvalue WHEN 'true' THEN 1 ELSE 0 END
-  FROM dbo.appConfig WITH (NOLOCK)
- WHERE name like 'FilterByCustomerLevelIsAscending'
-
-SELECT @ProductsDisplayed = CAST(ConfigValue AS INT) from AppConfig with (NOLOCK) where Name = 'RelatedProducts.NumberDisplayed'
-SELECT @DynamicProductsEnabled = CASE ConfigValue WHEN 'true' then 1 else 0 end from AppConfig with (NOLOCK) where Name = 'DynamicRelatedProducts.Enabled'
-select @relatedprods = replace(cast(relatedproducts as varchar(8000)), ' ', '') from dbo.product with (NOLOCK) where productid = @productid
-
-IF(@DynamicProductsEnabled = 1 and @ProductsDisplayed > 0)
-BEGIN
-	SELECT TOP (@ProductsDisplayed)
-	           tp.ProductID
-			 , tp.ProductGUID
-			 , tp.ImageFilenameOverride
-			 , tp.SKU
-			 , ISNULL(PRODUCTVARIANT.SkuSuffix, '') AS SkuSuffix
-			 , ISNULL(PRODUCTVARIANT.ManufacturerPartNumber, '') AS VariantManufacturerPartNumber
-			 , ISNULL(tp.ManufacturerPartNumber, '') AS ManufacturerPartNumber
-		     , ISNULL(PRODUCTVARIANT.Dimensions, '') AS Dimensions
-			 , PRODUCTVARIANT.Weight
-			 , ISNULL(PRODUCTVARIANT.GTIN, '') AS GTIN
-			 , PRODUCTVARIANT.VariantID
-			 , PRODUCTVARIANT.Condition
-			 , tp.SEAltText
-			 , tp.Name
-			 , tp.Description
-			 , ProductManufacturer.ManufacturerID AS ProductManufacturerId
-			 , Manufacturer.Name AS ProductManufacturerName
-			 , Manufacturer.SEName AS ProductManufacturerSEName
-		FROM Product tp WITH (NOLOCK)
-		JOIN (SELECT p.ProductID
-				   , p.ProductGUID
-				   , p.ImageFilenameOverride
-				   , p.SKU
-				   , p.SEAltText
-				   , p.Name
-				   , p.Description
-				FROM dbo.product p WITH (NOLOCK)
-				JOIN dbo.split(@relatedprods, ',') rp ON p.productid = CAST(rp.items AS INT)
-		   LEFT JOIN dbo.productcustomerlevel pcl WITH (NOLOCK) ON p.productid = pcl.productid and @FilterProductsByCustomerLevel = 1
-				JOIN (SELECT p.ProductID
-						FROM dbo.product p WITH (NOLOCK)
-						JOIN dbo.split(@relatedprods, ',') rp on p.productid = CAST(rp.items AS INT)
-						JOIN (SELECT ProductID
-								   , SUM(Inventory) Inventory
-								FROM dbo.productvariant WITH (NOLOCK) GROUP BY ProductID) pv ON p.ProductID = pv.ProductID
-						   LEFT JOIN (SELECT ProductID
-										   , SUM(quan) inventory
-										FROM dbo.inventory i1 WITH (NOLOCK)
-										JOIN dbo.productvariant pv1 WITH (NOLOCK) ON pv1.variantid = i1.variantid
-										JOIN dbo.split(@relatedprods, ',') rp1 ON pv1.productid = CAST(rp1.items AS INT) GROUP BY pv1.productid) i ON i.productid = p.productid
-								  WHERE CASE p.TrackInventoryBySizeAndColor WHEN 1 THEN ISNULL(i.inventory, 0) ELSE pv.inventory END >= @InvFilter
-					 ) tp on p.productid = tp.productid
-			   WHERE published = 1
-				 AND deleted = 0
-				 AND p.productid != @productid
-				 AND CASE
-					 WHEN @FilterProductsByCustomerLevel = 0 THEN 1
-					 WHEN @CustomerLevelFilteringIsAscending = 1 AND pcl.CustomerLevelID <= @CustomerLevelID OR pcl.CustomerLevelID IS NULL THEN 1
-					 WHEN @CustomerLevelID=0 AND pcl.CustomerLevelID IS NULL THEN 1
-					 WHEN @CustomerLevelID IS NULL OR @custlevelcount = 0 THEN 1
-					 WHEN pcl.CustomerLevelID = @CustomerLevelID OR pcl.CustomerLevelID IS NULL THEN 1
-					 ELSE 0
-					 END = 1
-	UNION ALL
-	   SELECT pr.ProductID
-			, pr.ProductGUID
-			, pr.ImageFilenameOverride
-			, pr.SKU
-			, pr.SEAltText
-			, pr.Name
-			, pr.Description
-		 FROM Product pr WITH (NOLOCK)
-		WHERE pr.ProductID IN (
-		SELECT TOP 100 PERCENT p.ProductID
-		  FROM Product p WITH (NOLOCK)
-		  JOIN (SELECT ProductID
-				  FROM ProductView WITH (NOLOCK) WHERE CustomerViewID
-					IN (SELECT CustomerViewID
-						  FROM ProductView WITH (NOLOCK)
-						 WHERE ProductID = @ProductID
-						   AND CustomerViewID <> @CustomerViewID
-					   )
-				   AND ProductID <> @ProductID
-				   AND ProductID NOT
-					IN (SELECT ProductID
-						  FROM product WITH (NOLOCK)
-						  JOIN split(@relatedprods, ',') rp ON productid = cast(rp.items AS INT)
-					  GROUP BY ProductID
-					   )
-				) a ON p.ProductID = a.ProductID
-	LEFT JOIN dbo.productcustomerlevel pcl WITH (NOLOCK) ON p.productid = pcl.productid and @FilterProductsByCustomerLevel = 1
-	LEFT JOIN dbo.ProductAffiliate pa WITH (NOLOCK) ON p.ProductID = pa.ProductID
-		WHERE Published = 1 AND Deleted = 0
-		 AND CASE
-			 WHEN @FilterProductsByCustomerLevel = 0 THEN 1
-			 WHEN @CustomerLevelFilteringIsAscending = 1 AND pcl.CustomerLevelID <= @CustomerLevelID OR pcl.CustomerLevelID IS NULL THEN 1
-			 WHEN @CustomerLevelID=0 AND pcl.CustomerLevelID IS NULL THEN 1
-			 WHEN @CustomerLevelID IS NULL OR @custlevelcount = 0 THEN 1
-			 WHEN pcl.CustomerLevelID = @CustomerLevelID OR pcl.CustomerLevelID IS NULL THEN 1
-			 ELSE 0
-			  END = 1
-		AND (pa.AffiliateID = @affiliateID OR pa.AffiliateID IS NULL OR @affiliatecount = 0 OR @FilterProductsByAffiliate = 0)
-	GROUP BY p.ProductID
-	ORDER BY COUNT(*) DESC
-		)
-	  )prd ON tp.ProductID = prd.ProductID
-	 LEFT JOIN dbo.ProductManufacturer WITH (NOLOCK) ON tp.ProductID = ProductManufacturer.ProductID
-	 LEFT JOIN dbo.Manufacturer WITH (NOLOCK) ON ProductManufacturer.ManufacturerID = Manufacturer.ManufacturerID
-	      JOIN PRODUCTVARIANT WITH (NOLOCK) ON PRODUCTVARIANT.productid = CAST(tp.ProductID AS INT) AND PRODUCTVARIANT.isdefault = 1 AND PRODUCTVARIANT.Published = 1 AND PRODUCTVARIANT.Deleted = 0
-	INNER JOIN (SELECT DISTINCT a.ProductID
-				  FROM Product a WITH (NOLOCK)
-			 LEFT JOIN ProductStore b WITH (NOLOCK) ON a.ProductID = b.ProductID
-				 WHERE (@filterProduct = 0 OR StoreID = @storeID)) ps ON tp.ProductID = ps.ProductID
-END
-
-IF(@DynamicProductsEnabled = 0 and @ProductsDisplayed > 0)
-BEGIN
-	select TOP (@ProductsDisplayed)
-	           p.ProductID
-			 , p.ProductGUID
-			 , p.ImageFilenameOverride
-			 , p.SKU
-			 , ISNULL(PRODUCTVARIANT.SkuSuffix, '') AS SkuSuffix
-			 , ISNULL(PRODUCTVARIANT.ManufacturerPartNumber, '') AS VariantManufacturerPartNumber
-			 , ISNULL(p.ManufacturerPartNumber, '') AS ManufacturerPartNumber
-		     , ISNULL(PRODUCTVARIANT.Dimensions, '') AS Dimensions
-			 , PRODUCTVARIANT.Weight
-			 , ISNULL(PRODUCTVARIANT.GTIN, '') AS GTIN
-			 , PRODUCTVARIANT.VariantID
-			 , PRODUCTVARIANT.Condition
-			 , p.SEAltText
-			 , p.Name
-			 , p.Description
-			 , ProductManufacturer.ManufacturerID AS ProductManufacturerId
-			 , Manufacturer.Name AS ProductManufacturerName
-			 , Manufacturer.SEName AS ProductManufacturerSEName
-		  FROM dbo.product p WITH (NOLOCK)
-	 LEFT JOIN dbo.ProductManufacturer WITH (NOLOCK) ON p.ProductID = ProductManufacturer.ProductID
-	 LEFT JOIN dbo.Manufacturer WITH (NOLOCK) ON ProductManufacturer.ManufacturerID = Manufacturer.ManufacturerID
-		  JOIN dbo.split(@relatedprods, ',') rp ON p.productid = CAST(rp.items AS INT)
-		  JOIN PRODUCTVARIANT WITH (NOLOCK) ON PRODUCTVARIANT.productid = CAST(rp.items AS INT) AND PRODUCTVARIANT.isdefault = 1 AND PRODUCTVARIANT.Published = 1 AND PRODUCTVARIANT.Deleted = 0
-	 LEFT JOIN dbo.productcustomerlevel pcl WITH (NOLOCK) ON p.productid = pcl.productid AND @FilterProductsByCustomerLevel = 1
-		  JOIN (SELECT p.ProductID
-				  FROM dbo.product p WITH (NOLOCK)
-				  JOIN dbo.split(@relatedprods, ',') rp on p.productid = cast(rp.items as int)
-				  JOIN (SELECT ProductID
-							 , SUM(Inventory) Inventory
-						  FROM dbo.productvariant WITH (NOLOCK)
-					  GROUP BY ProductID) pv ON p.ProductID = pv.ProductID
-					 LEFT JOIN (SELECT ProductID
-									 , SUM(quan) inventory
-								  FROM dbo.inventory i1 WITH (NOLOCK)
-								  JOIN dbo.productvariant pv1 WITH (NOLOCK) ON pv1.variantid = i1.variantid
-								  JOIN dbo.split(@relatedprods, ',') rp1 ON pv1.productid = CAST(rp1.items AS INT)
-							  GROUP BY pv1.productid) i ON i.productid = p.productid
-								 WHERE CASE p.TrackInventoryBySizeAndColor WHEN 1 THEN ISNULL(i.inventory, 0) ELSE pv.inventory END >= @InvFilter
-								) tp ON p.productid = tp.productid
-					INNER JOIN (SELECT DISTINCT a.ProductID
-								  FROM Product a WITH (NOLOCK)
-							 LEFT JOIN ProductStore b WITH (NOLOCK) ON a.ProductID = b.ProductID
-								 WHERE (@filterProduct = 0 OR StoreID = @storeID)
-								) ps ON p.ProductID = ps.ProductID
-						 WHERE p.published = 1 and p.deleted = 0 and p.productid != @productid
-						   AND CASE
-							   WHEN @FilterProductsByCustomerLevel = 0 THEN 1
-							   WHEN @CustomerLevelFilteringIsAscending = 1 AND pcl.CustomerLevelID <= @CustomerLevelID OR pcl.CustomerLevelID IS NULL THEN 1
-							   WHEN @CustomerLevelID=0 AND pcl.CustomerLevelID IS NULL THEN 1
-							   WHEN @CustomerLevelID IS NULL OR @custlevelcount = 0 THEN 1
-							   WHEN pcl.CustomerLevelID = @CustomerLevelID OR pcl.CustomerLevelID IS NULL THEN 1
-							   else 0
-								end = 1
-END
-GO
-
 IF EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID('dbo.aspdnsf_ProductInfo') AND type IN ( N'P', N'PC' ) )
 	begin
 	 DROP PROCEDURE dbo.aspdnsf_ProductInfo;
@@ -9737,478 +9317,6 @@ IF EXISTS (select * from dbo.sysobjects where id = object_id('aspdnsf_GetRecentl
     drop proc [dbo].[aspdnsf_GetRecentlyViewedProducts]
 GO
 
-IF EXISTS (select * from dbo.sysobjects where id = object_id(N'[dbo].aspdnsf_GetProducts') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
-    drop proc [dbo].[aspdnsf_GetProducts]
-GO
-
-CREATE proc [dbo].[aspdnsf_GetProducts]
-    @categoryID      int = null,
-    @sectionID       int = null,
-    @manufacturerID  int = null,
-    @distributorID   int = null,
-    @genreID         int = null,
-    @vectorID        int = null,
-    @localeID        int = null,
-    @CustomerLevelID int = null,
-    @affiliateID     int = null,
-    @ProductTypeID   int = null,
-    @ViewType        bit = 1, -- 0 = all variants, 1 = one variant
-    @sortEntity      int = 0, -- 1 = category, 2 = section, 3 = manufacturer, 4 = distributor, 5= genre, 6 = vector
-    @pagenum         int = 1,
-    @pagesize        int = null,
-    @StatsFirst      tinyint = 1,
-    @searchstr       nvarchar(4000) = null,
-    @extSearch       tinyint = 0,
-    @publishedonly   tinyint = 0,
-    @ExcludePacks    tinyint = 0,
-    @ExcludeKits     tinyint = 0,
-    @ExcludeSysProds tinyint = 0,
-    @InventoryFilter int = 0,  --  will only show products with an inventory level GREATER OR EQUAL TO than the number specified in this parameter, set to -1 to disable inventory filtering
-    @sortEntityName  varchar(20) = '', -- usely only when the entity id is provided, allowed values: category, section, manufacturer, distributor, genre, vector
-    @localeName      varchar(20) = '',
-    @OnSaleOnly      tinyint = 0,
-	@storeID		 int = 1,
-	@filterProduct	 bit = 0,
-	@sortby			 varchar(10) = 'default',
-	@since			 int = 180  -- best sellers in the last "@since" number of days
-AS
-BEGIN
-	SET NOCOUNT ON
-
-    DECLARE @rcount int
-    DECLARE @productfiltersort table (rownum int not null identity  primary key, productid int not null, price money null, saleprice money null, displayorder int not null, VariantID int not null, VariantDisplayOrder int not null, ProductName nvarchar(400) null, VariantName nvarchar(400) null)
-    DECLARE @productfilter table (rownum int not null identity  primary key, productid int not null, price money null, saleprice money null,  displayorder int not null, VariantID int not null, VariantDisplayOrder int not null, ProductName nvarchar(400) null, VariantName nvarchar(400) null)
-	DECLARE @FilterProductsByAffiliate tinyint, @FilterProductsByCustomerLevel tinyint, @HideProductsWithLessThanThisInventoryLevel int
-    CREATE TABLE #displayorder ([name] nvarchar (800), productid int not null primary key, displayorder int not null)
-    CREATE TABLE #inventoryfilter (productid int not null, variantid int not null, InvQty int not null)
-    CREATE CLUSTERED INDEX tmp_inventoryfilter ON #inventoryfilter (productid, variantid)
-
-    DECLARE @custlevelcount int, @sectioncount int, @localecount int, @affiliatecount int, @categorycount int, @CustomerLevelFilteringIsAscending bit, @distributorcount int, @genrecount int, @vectorcount int, @manufacturercount int
-
-	DECLARE @ftsenabled tinyint
-
-	SET @ftsenabled = 0
-
-	IF ((SELECT DATABASEPROPERTY(db_name(db_id()),'IsFulltextEnabled')) = 1
-		AND EXISTS (SELECT * FROM sysobjects WHERE id = OBJECT_ID(N'[dbo].[KeyWordSearch]') AND type in (N'FN', N'IF', N'TF', N'FS', N'FT'))
-		AND EXISTS (SELECT * FROM sysobjects WHERE id = OBJECT_ID(N'[dbo].[GetValidSearchString]') AND type in (N'FN', N'IF', N'TF', N'FS', N'FT')))
-	BEGIN
-		SET @ftsenabled = 1
-	END
-
-    SET @FilterProductsByAffiliate = (SELECT TOP 1 case ConfigValue when 'true' then 1 else 0 end FROM dbo.AppConfig with (nolock) WHERE [Name] = 'FilterProductsByAffiliate' AND (StoreID=@storeID OR StoreID=0) ORDER BY StoreID desc)
-    SET @FilterProductsByCustomerLevel = (SELECT TOP 1 case ConfigValue when 'true' then 1 else 0 end FROM dbo.AppConfig with (nolock) WHERE [Name] = 'FilterProductsByCustomerLevel' AND (StoreID=@storeID OR StoreID=0) ORDER BY StoreID desc)
-    SET @HideProductsWithLessThanThisInventoryLevel = (SELECT TOP 1 case ConfigValue when -1 then 0 else ConfigValue end FROM dbo.AppConfig with (nolock) WHERE [Name] = 'HideProductsWithLessThanThisInventoryLevel' AND (StoreID=@storeID OR StoreID=0) ORDER BY StoreID desc)
-
-    IF @InventoryFilter <> -1 and (@HideProductsWithLessThanThisInventoryLevel > @InventoryFilter or @HideProductsWithLessThanThisInventoryLevel  = -1)
-        SET @InventoryFilter  = @HideProductsWithLessThanThisInventoryLevel
-
-    SET @categoryID      = nullif(@categoryID, 0)
-    SET @sectionID       = nullif(@sectionID, 0)
-    SET @manufacturerID  = nullif(@manufacturerID, 0)
-    SET @distributorID   = nullif(@distributorID, 0)
-    SET @genreID         = nullif(@genreID, 0)
-    SET @vectorID        = nullif(@vectorID, 0)
-    SET @affiliateID     = nullif(@affiliateID, 0)
-    SET @ProductTypeID   = nullif(@ProductTypeID, 0)
-
-
-    SET @CustomerLevelFilteringIsAscending  = 0
-    SET @CustomerLevelFilteringIsAscending = (SELECT TOP 1 case ConfigValue when 'true' then 1 else 0 end FROM dbo.AppConfig with (nolock) WHERE [Name] = 'FilterByCustomerLevelIsAscending' AND (StoreID=@storeID OR StoreID=0) ORDER BY StoreID desc)
-
-    IF @localeID is null and ltrim(rtrim(@localeName)) <> ''
-        SELECT @localeID = LocaleSettingID FROM dbo.LocaleSetting with (nolock) WHERE Name = ltrim(rtrim(@localeName))
-
-    select @categorycount     = si.rows from sysobjects so with (nolock) join sysindexes si with (nolock) on so.id = si.id where so.id = object_id('productcategory') and si.indid < 2 and type = 'u'
-    select @sectioncount      = si.rows from sysobjects so with (nolock) join sysindexes si with (nolock) on so.id = si.id where so.id = object_id('productsection') and si.indid < 2 and type = 'u'
-    select @localecount       = si.rows from sysobjects so with (nolock) join sysindexes si with (nolock) on so.id = si.id where so.id = object_id('ProductLocaleSetting') and si.indid < 2 and type = 'u'
-    select @custlevelcount    = si.rows from sysobjects so with (nolock) join sysindexes si with (nolock) on so.id = si.id where so.id = object_id('ProductCustomerLevel') and si.indid < 2 and type = 'u'
-    select @affiliatecount    = si.rows from sysobjects so with (nolock) join sysindexes si with (nolock) on so.id = si.id where so.id = object_id('ProductAffiliate') and si.indid < 2 and type = 'u'
-    select @distributorcount  = si.rows from sysobjects so with (nolock) join sysindexes si with (nolock) on so.id = si.id where so.id = object_id('ProductDistributor') and si.indid < 2 and type = 'u'
-    select @genrecount        = si.rows from sysobjects so with (nolock) join sysindexes si with (nolock) on so.id = si.id where so.id = object_id('ProductGenre') and si.indid < 2 and type = 'u'
-    select @vectorcount       = si.rows from sysobjects so with (nolock) join sysindexes si with (nolock) on so.id = si.id where so.id = object_id('ProductVector') and si.indid < 2 and type = 'u'
-    select @manufacturercount = si.rows from sysobjects so with (nolock) join sysindexes si with (nolock) on so.id = si.id where so.id = object_id('ProductManufacturer') and si.indid < 2 and type = 'u'
-
-
-    -- get page size
-    IF @pagesize is null or @pagesize = 0 BEGIN
-        IF @categoryID is not null
-            SELECT @pagesize = PageSize FROM dbo.Category with (nolock) WHERE categoryID = @categoryID
-        ELSE IF @sectionID is not null
-            SELECT @pagesize = PageSize FROM dbo.Section with (nolock) WHERE sectionID = @sectionID
-        ELSE IF @manufacturerID is not null
-            SELECT @pagesize = PageSize FROM dbo.Manufacturer with (nolock) WHERE manufacturerID = @manufacturerID
-        ELSE IF @distributorID is not null
-            SELECT @pagesize = PageSize FROM dbo.Distributor with (nolock) WHERE distributorID = @distributorID
-        ELSE IF @genreID is not null
-            SELECT @pagesize = PageSize FROM dbo.Genre with (nolock) WHERE genreID = @genreID
-        ELSE IF @vectorID is not null
-            SELECT @pagesize = PageSize FROM dbo.Vector with (nolock) WHERE vectorID = @vectorID
-        ELSE
-            SELECT @pagesize = convert(int, ConfigValue) FROM dbo.AppConfig with (nolock) WHERE [Name] = 'Default_CategoryPageSize'
-    END
-
-    IF @pagesize is null or @pagesize = 0
-        SET @pagesize = 20
-
-    -- get sort order
-    IF @sortEntity = 1 or @sortEntityName = 'category' BEGIN
-        INSERT #displayorder select distinct null as [name], a.productid, displayorder from dbo.ProductCategory a with (nolock) inner join (select distinct a.ProductID from ProductCategory a with (nolock)
-        left join ProductStore b with (nolock) on a.ProductID = b.ProductID where (@filterProduct = 0 or StoreID = @storeID)) b  on a.ProductID = b.ProductID where categoryID = @categoryID
-    END
-    ELSE IF @sortEntity = 2 or @sortEntityName = 'section' BEGIN
-        INSERT #displayorder select distinct null as [name], a.productid, displayorder from dbo.ProductSection a with (nolock) inner join (select distinct a.ProductID from ProductSection a with (nolock)
-        left join ProductStore b with (nolock) on a.ProductID = b.ProductID where (@filterProduct = 0 or StoreID = @storeID)) b on a.ProductID = B.ProductID where sectionId = @sectionID
-    END
-    ELSE IF @sortEntity = 3 or @sortEntityName = 'manufacturer' BEGIN
-        INSERT #displayorder select distinct null as [name], a.productid, displayorder from dbo.ProductManufacturer a with (nolock) inner join (select distinct a.ProductID from ProductManufacturer a with (nolock)
-        left join ProductStore b with (nolock) on a.ProductID = b.ProductID where (@filterProduct = 0 or StoreID = @storeID)) b on a.ProductID = B.ProductID where ManufacturerID = @manufacturerID
-    END
-    ELSE IF @sortEntity = 4 or @sortEntityName = 'distributor' BEGIN
-        INSERT #displayorder select distinct null as [name], a.productid, displayorder from dbo.ProductDistributor a with (nolock) inner join (select distinct a.ProductID from ProductDistributor a with (nolock)
-        left join ProductStore b with (nolock) on a.ProductID = b.ProductID where (@filterProduct = 0 or StoreID = @storeID)) b on a.ProductID = B.ProductID where DistributorID = @distributorID
-    END
-    ELSE IF @sortEntity = 5 or @sortEntityName = 'genre' BEGIN
-        INSERT #displayorder select distinct null as [name], a.productid, displayorder from dbo.ProductGenre a with (nolock) inner join (select distinct a.ProductID from ProductGenre a with (nolock)
-        left join ProductStore b with (nolock) on a.ProductID = b.ProductID where (@filterProduct = 0 or StoreID = @storeID)) b on a.ProductID = B.ProductID where GenreID = @genreID
-    END
-    ELSE IF @sortEntity = 6 or @sortEntityName = 'vector' BEGIN
-        INSERT #displayorder select distinct null as [name], a.productid, displayorder from dbo.ProductVector a with (nolock) inner join (select distinct a.ProductID from ProductVector a with (nolock)
-        left join ProductStore b with (nolock) on a.ProductID = b.ProductID where (@filterProduct = 0 or StoreID = @storeID)) b on a.ProductID = B.ProductID where VectorID = @vectorID
-    END
-    ELSE BEGIN
-        INSERT #displayorder select distinct [name], a.productid, 1 from dbo.Product a with (nolock) inner join (select distinct a.ProductID from Product a with (nolock)
-        left join ProductStore b with (nolock) on a.ProductID = b.ProductID where (@filterProduct = 0 or StoreID = @storeID)) b on a.ProductID = B.ProductID ORDER BY Name
-    END
-
-	IF (@ftsenabled = 1)
-	BEGIN
-		IF rtrim(isnull(@searchstr, '')) <> ''
-		BEGIN
-			DECLARE @tmpsrch nvarchar(4000)
-			SET @tmpsrch = dbo.GetValidSearchString(@searchstr)
-			DELETE #displayorder from #displayorder d left join dbo.KeyWordSearch(@tmpsrch) k on d.productid = k.productid where k.productid is null
-		END
-	END
-
-	SET @searchstr = '%' + rtrim(ltrim(@searchstr)) + '%'
-
-    IF @InventoryFilter <> -1 BEGIN
-        IF @ViewType = 1 BEGIN
-            INSERT #inventoryfilter
-            SELECT p.productid, pv.VariantID, sum(case p.TrackInventoryBySizeAndColor when 1 then isnull(i.quan, 0) else pv.inventory end ) invqty
-            FROM product p with (NOLOCK) join #displayorder d on p.ProductID = d.ProductID
-                join ProductVariant pv with (NOLOCK) on p.ProductID = pv.ProductID  and pv.IsDefault = 1
-                left join Inventory i with (NOLOCK) on pv.VariantID = i.VariantID
-            GROUP BY p.productid, pv.VariantID
-            HAVING sum(case p.TrackInventoryBySizeAndColor when 1 then isnull(i.quan, 0) else pv.inventory end ) >= @InventoryFilter
-        END
-        ELSE
-            INSERT #inventoryfilter
-            SELECT p.productid, pv.VariantID, sum(case p.TrackInventoryBySizeAndColor when 1 then isnull(i.quan, 0) else pv.inventory end ) invqty
-            FROM product p with (NOLOCK) join #displayorder d on p.ProductID = d.ProductID
-                join ProductVariant pv with (NOLOCK) on p.ProductID = pv.ProductID
-                left join Inventory i with (NOLOCK) on pv.VariantID = i.VariantID
-            GROUP BY p.productid, pv.VariantID
-            HAVING sum(case p.TrackInventoryBySizeAndColor when 1 then isnull(i.quan, 0) else pv.inventory end ) >= @InventoryFilter
-
-
-        INSERT @productfilter (productid, displayorder, VariantID, VariantDisplayOrder, ProductName, VariantName)
-        SELECT distinct p.productid, do.displayorder, pv.VariantID, pv.DisplayOrder, p.Name, pv.Name
-        FROM
-            product p with (nolock)
-            join #displayorder do on p.ProductID = do.ProductID
-            left join ProductVariant pv        with (NOLOCK) ON p.ProductID = pv.ProductID and pv.IsDefault >= @ViewType
-            left join productcategory pc       with (nolock) on p.ProductID = pc.ProductID
-            left join productsection ps        with (nolock) on p.ProductID = ps.ProductID
-            left join ProductManufacturer pm   with (nolock) on p.ProductID = pm.ProductID
-            left join ProductDistributor pd    with (nolock) on p.ProductID = pd.ProductID
-            left join ProductGenre px          with (nolock) on p.ProductID = px.ProductID
-            left join ProductVector px2        with (nolock) on p.ProductID = px2.ProductID
-            left join ProductLocaleSetting pl  with (nolock) on p.ProductID = pl.ProductID
-            left join ProductCustomerLevel pcl with (nolock) on p.ProductID = pcl.ProductID
-            left join ProductAffiliate pa      with (nolock) on p.ProductID = pa.ProductID
-
-            join #inventoryfilter i on pv.VariantID = i.VariantID
-        WHERE
-              (pc.categoryid = @categoryID or @categoryID is null or @categorycount = 0)
-          and (ps.sectionid = @sectionID or @sectionID is null or @sectioncount = 0)
-          and (pl.LocaleSettingID = @localeID or @localeID is null or @localecount = 0)
-          and (pa.AffiliateID = @affiliateID or pa.AffiliateID is null or @affiliatecount = 0 or @FilterProductsByAffiliate = 0)
-          and (pm.manufacturerid = @manufacturerID or @manufacturerID is null or @manufacturercount = 0)
-          and (pd.DistributorID = @distributorID or @distributorID is null or @distributorcount = 0)
-          and (px.GenreID = @genreID or @genreID is null or @genrecount = 0)
-          and (px2.VectorID = @vectorID or @vectorID is null or @vectorcount = 0)
-          and p.ProductTypeID = coalesce(@ProductTypeID, p.ProductTypeID)
-          and (case
-                when @FilterProductsByCustomerLevel = 0 or @custlevelcount = 0 or pcl.CustomerLevelID is null or @CustomerLevelID is null then 1
-                when @CustomerLevelFilteringIsAscending = 1 and pcl.CustomerLevelID <= @CustomerLevelID then 1
-                when pcl.CustomerLevelID = @CustomerLevelID or pcl.CustomerLevelID is null then 1
-                else 0
-               end  = 1
-              )
-          and (@ftsenabled = 1 or
-				(@ftsenabled = 0 and
-					(@searchstr is null
-					 or patindex(@searchstr, isnull(p.name, '')) > 0
-					 or patindex(@searchstr, isnull(convert(nvarchar(20),p.productid), '')) > 0
-					 or patindex(@searchstr, isnull(pv.name, '')) > 0
-					 or patindex(@searchstr, isnull(p.sku , '')+isnull(pv.skusuffix , '')) > 0
-					 or patindex(@searchstr, isnull(p.manufacturerpartnumber, '')) > 0
-					 or patindex(@searchstr, isnull(pv.manufacturerpartnumber, '')) > 0
-					 or (patindex(@searchstr, isnull(p.Description, '')) > 0 and @extSearch = 1)
-					 or (patindex(@searchstr, isnull(p.Summary, '')) > 0 and @extSearch = 1)
-					)
-				)
-              )
-          and case when isnull(pv.saleprice,0) = 0 then 0 else 1 end >= @OnSaleOnly
-          and p.published >= @publishedonly
-          and pv.published >= @publishedonly
-          and isnull(p.IsAPack, 0) <= 1-@ExcludePacks
-          and isnull(p.IsAKit, 0) <= 1-@ExcludeKits
-          and p.IsSystem <= 1-@ExcludeSysProds
-          and p.Deleted = 0
-          and pv.Deleted = 0
-        order by do.displayorder, p.Name, pv.DisplayOrder, pv.Name
-
-    END
-    ELSE BEGIN
-        INSERT @productfilter (productid, displayorder, VariantID, VariantDisplayOrder, ProductName, VariantName)
-        SELECT distinct p.productid, do.displayorder, pv.VariantID, pv.DisplayOrder, p.Name, pv.Name
-        FROM
-            product p with (nolock)
-            join #displayorder do on p.ProductID = do.ProductID
-            join ProductVariant pv             with (NOLOCK) on p.ProductID = pv.ProductID and pv.IsDefault >= @ViewType
-            left join productcategory pc       with (nolock) on p.ProductID = pc.ProductID
-            left join productsection ps        with (nolock) on p.ProductID = ps.ProductID
-            left join ProductManufacturer pm   with (nolock) on p.ProductID = pm.ProductID
-            left join ProductDistributor pd    with (nolock) on p.ProductID = pd.ProductID
-            left join ProductGenre px          with (nolock) on p.ProductID = px.ProductID
-            left join ProductVector px2        with (nolock) on p.ProductID = px2.ProductID
-            left join ProductLocaleSetting pl  with (nolock) on p.ProductID = pl.ProductID
-            left join ProductCustomerLevel pcl with (nolock) on p.ProductID = pcl.ProductID
-            left join ProductAffiliate pa      with (nolock) on p.ProductID = pa.ProductID
-        WHERE
-              (pc.categoryid = @categoryID or @categoryID is null or @categorycount = 0)
-          and (ps.sectionid = @sectionID or @sectionID is null or @sectioncount = 0)
-          and (pl.LocaleSettingID = @localeID or @localeID is null or @localecount = 0)
-          and (pa.AffiliateID = @affiliateID or pa.AffiliateID is null or @affiliatecount = 0 or @FilterProductsByAffiliate = 0)
-          and (pm.manufacturerid = @manufacturerID or @manufacturerID is null or @manufacturercount = 0)
-          and (pd.DistributorID = @distributorID or @distributorID is null or @distributorcount = 0)
-          and (px.GenreID = @genreID or @genreID is null or @genrecount = 0)
-          and (px2.VectorID = @vectorID or @vectorID is null or @vectorcount = 0)
-          and p.ProductTypeID = coalesce(@ProductTypeID, p.ProductTypeID)
-          and (case
-                when @FilterProductsByCustomerLevel = 0 or @custlevelcount = 0 or pcl.CustomerLevelID is null or @CustomerLevelID is null then 1
-                when @CustomerLevelFilteringIsAscending = 1 and pcl.CustomerLevelID <= @CustomerLevelID then 1
-                when pcl.CustomerLevelID = @CustomerLevelID or pcl.CustomerLevelID is null then 1
-                else 0
-               end  = 1
-              )
-          and (@ftsenabled = 1 or
-				(@ftsenabled = 0 and
-					(@searchstr is null
-					or patindex(@searchstr, isnull(p.name, '')) > 0
-					or patindex(@searchstr, isnull(convert(nvarchar(20),p.productid), '')) > 0
-					or patindex(@searchstr, isnull(pv.name, '')) > 0
-					or patindex(@searchstr, isnull(p.sku , '')+isnull(pv.skusuffix , '')) > 0
-					or patindex(@searchstr, isnull(p.manufacturerpartnumber, '')) > 0
-					or patindex(@searchstr, isnull(pv.manufacturerpartnumber, '')) > 0
-					or (patindex(@searchstr, isnull(p.Description, '')) > 0 and @extSearch = 1)
-					or (patindex(@searchstr, isnull(p.Summary, '')) > 0 and @extSearch = 1)
-					)
-				)
-              )
-          and case when isnull(pv.saleprice,0) = 0 then 0 else 1 end >= @OnSaleOnly
-          and p.published >= @publishedonly
-          and pv.published >= @publishedonly
-          and isnull(p.IsAPack, 0) <= 1-@ExcludePacks
-          and isnull(p.IsAKit, 0) <= 1-@ExcludeKits
-          and p.IsSystem <= 1-@ExcludeSysProds
-          and p.Deleted = 0
-          and pv.Deleted = 0
-        order by do.displayorder, p.Name, pv.DisplayOrder, pv.Name
-    END
-
-    SET @rcount = @@rowcount
-    IF @StatsFirst = 1
-        SELECT cast(ceiling(@rcount*1.0/@pagesize) as int) pages, @rcount ProductCount
-
-
-  --Begin sorting
-  	if @sortby = 'bestseller'
-		begin
-			insert @productfiltersort (productid, price, saleprice, displayorder, VariantID, VariantDisplayOrder, ProductName, VariantName)
-			select pf.productid, pf.price, pf.saleprice, pf.displayorder, pf.VariantID, pf.VariantDisplayOrder, pf.ProductName, pf.VariantName
-				from @productfilter pf
-				inner join (
-					select ProductID, SUM(Quantity) AS NumSales
-					  from dbo.Orders_ShoppingCart sc with (NOLOCK)
-							join [dbo].Orders o with (NOLOCK)  on sc.OrderNumber = o.OrderNumber and o.OrderDate >= dateadd(dy, -@since, getdate())
-					  group by ProductID
-				) bsSort on pf.productid = bsSort.ProductID
-				order by isnull(bsSort.NumSales, 0) DESC
-		end
-  	else --default
-		begin
-			insert @productfiltersort (productid, price, saleprice, displayorder, VariantID, VariantDisplayOrder, ProductName, VariantName)
-			select productid, price, saleprice, displayorder, VariantID, VariantDisplayOrder, ProductName, VariantName
-			from @productfilter order by displayorder, productName, variantDisplayOrder, variantName
-		end
-
-    ---- Check filtered products for recurring variants
-    Declare @ProductResults Table
-    (
-		ProductID int
-		, VariantID int
-		, HasRecurring bit
-		, RowNum int
-    );
-    -- temp table based on filtered product result set
-    Insert Into @ProductResults
-
-    SELECT   Distinct
-        p.ProductID,
-		pv.VariantID,
-		0,
-		pf.rownum
-    FROM dbo.Product p with (NOLOCK)
-        left join dbo.ProductVariant       pv  with (NOLOCK) on p.ProductID = pv.ProductID and pv.IsDefault >= @ViewType
-        join @productfiltersort            pf                on pv.ProductID = pf.ProductID and pv.VariantID = pf.VariantID
-    WHERE pf.rownum >= @pagesize*(@pagenum-1)+1 and pf.rownum <= @pagesize*(@pagenum)
-    ORDER BY pf.rownum
-
-    -- set HasRecurring
-    Update pr
-    Set HasRecurring = 1
-    From @ProductResults pr, (
-    Select prs.ProductId
-    From @ProductResults prs, ProductVariant pv
-    Where prs.ProductID = pv.ProductID
-    And pv.IsRecurring = 1
-    And pv.Deleted = 0
-    And pv.Published = 1
-    Group By prs.ProductId
-    Having Count(*) > 0) tmp
-    Where pr.ProductId = tmp.ProductId
-    ---- End Recurring
-
-    SELECT
-        p.ProductID,
-        p.Name,
-        pv.VariantID,
-        pv.Name AS VariantName,
-        p.ProductGUID,
-        p.Summary,
-        p.Description,
-        p.SEKeywords,
-        p.SEDescription,
-        p.MiscText,
-        p.FroogleDescription,
-        p.SETitle,
-        p.SEAltText,
-        p.SizeOptionPrompt,
-        p.ColorOptionPrompt,
-        p.TextOptionPrompt,
-        p.ProductTypeID,
-        p.TaxClassID,
-        p.SKU,
-        p.ManufacturerPartNumber,
-        p.SalesPromptID,
-        p.IsFeatured,
-        p.XmlPackage,
-        p.ColWidth,
-        p.Published,
-        p.RequiresRegistration,
-        p.Looks,
-        p.Notes,
-        p.QuantityDiscountID,
-        p.RelatedProducts,
-        p.UpsellProducts,
-        p.UpsellProductDiscountPercentage,
-        p.RelatedDocuments,
-        p.TrackInventoryBySizeAndColor,
-        p.TrackInventoryBySize,
-        p.TrackInventoryByColor,
-        p.IsAKit,
-        p.ShowInProductBrowser,
-        p.IsAPack,
-        p.PackSize,
-        p.ShowBuyButton,
-        p.RequiresProducts,
-        p.HidePriceUntilCart,
-        p.IsCalltoOrder,
-        p.ExcludeFromPriceFeeds,
-        p.RequiresTextOption,
-        p.TextOptionMaxLength,
-        p.SEName,
-        p.Deleted,
-        p.CreatedOn,
-        p.ImageFileNameOverride,
-        pv.VariantGUID,
-        pv.Description AS VariantDescription,
-        pv.SEKeywords AS VariantSEKeywords,
-        pv.SEDescription AS VariantSEDescription,
-        pv.Colors,
-        pv.ColorSKUModifiers,
-        pv.Sizes,
-        pv.SizeSKUModifiers,
-        pv.FroogleDescription AS VariantFroogleDescription,
-        pv.SKUSuffix,
-        pv.ManufacturerPartNumber AS VariantManufacturerPartNumber,
-        pv.Price,
-        pv.CustomerEntersPrice,
-        pv.CustomerEntersPricePrompt,
-        isnull(pv.SalePrice, 0) SalePrice,
-        cast(isnull(pv.Weight,0) as decimal(10,1)) Weight,
-        pv.MSRP,
-        pv.Cost,
-        isnull(pv.Points,0) Points,
-        pv.Dimensions,
-        case p.TrackInventoryBySizeAndColor when 1 then isnull(i.quan, 0) else pv.inventory end Inventory,
-        pv.DisplayOrder as VariantDisplayOrder,
-        pv.Notes AS VariantNotes,
-        pv.IsTaxable,
-        pv.IsShipSeparately,
-        pv.IsDownload,
-        pv.DownloadLocation,
-        pv.Published AS VariantPublished,
-        pv.IsSecureAttachment,
-        pv.IsRecurring,
-        pv.RecurringInterval,
-        pv.RecurringIntervalType,
-        pv.SEName AS VariantSEName,
-        pv.RestrictedQuantities,
-        pv.MinimumQuantity,
-        pv.Deleted AS VariantDeleted,
-        pv.CreatedOn AS VariantCreatedOn,
-        d.Name AS DistributorName,
-        d.DistributorID,
-        d.SEName AS DistributorSEName,
-        m.ManufacturerID,
-        m.Name AS ManufacturerName,
-        m.SEName AS ManufacturerSEName,
-        s.Name AS SalesPromptName,
-        pf.HasRecurring,
-        case when pcl.productid is null then 0 else isnull(ep.Price, 0) end ExtendedPrice
-    FROM dbo.Product p with (NOLOCK)
-        left join dbo.ProductVariant       pv  with (NOLOCK) on p.ProductID = pv.ProductID and pv.IsDefault >= @ViewType
-        join @ProductResults			   pf                on pv.ProductID = pf.ProductID and pv.VariantID = pf.VariantID
-        left join dbo.SalesPrompt           s  with (NOLOCK) on p.SalesPromptID = s.SalesPromptID
-        left join dbo.ProductManufacturer  pm  with (NOLOCK) on p.ProductID = pm.ProductID
-        left join dbo.Manufacturer          m  with (NOLOCK) on pm.ManufacturerID = m.ManufacturerID
-        left join dbo.ProductDistributor   pd  with (NOLOCK) on p.ProductID = pd.ProductID
-        left join dbo.Distributor           d  with (NOLOCK) on pd.DistributorID = d.DistributorID
-        left join dbo.ExtendedPrice        ep  with (NOLOCK) on ep.VariantID = pv.VariantID and ep.CustomerLevelID = @CustomerLevelID
-        left join dbo.ProductCustomerLevel pcl with (NOLOCK) on p.ProductID = pcl.ProductID and pcl.CustomerLevelID = @CustomerLevelID
-        left join (select VariantID, sum(quan) quan from dbo.Inventory with (nolock) group by VariantID) i  on pv.VariantID = i.VariantID
-
-    IF @StatsFirst <> 1
-        SELECT cast(ceiling(@rcount*1.0/@pagesize) as int) pages, @rcount ProductCount
-END
----- END Add HasRecurring to GetProducts   -----
-GO
-
 IF EXISTS (select * from dbo.sysobjects where id = object_id(N'[dbo].aspdnsf_CloneProduct') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
     drop proc [dbo].[aspdnsf_CloneProduct]
 GO
@@ -10524,130 +9632,6 @@ AS
                 ) a on Entity.CustomerLevelID = a.CustomerLevelID
     WHERE Deleted=0
 
-GO
-
-IF EXISTS (select * from dbo.sysobjects where id = object_id(N'[dbo].aspdnsf_EntityMgr') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
-    drop proc [dbo].[aspdnsf_EntityMgr]
-GO
-
-CREATE proc [dbo].[aspdnsf_EntityMgr]
-    @EntityName varchar(100),
-    @PublishedOnly tinyint
-
-
-AS
-BEGIN
-    SET NOCOUNT ON
-    IF @EntityName = 'Category' BEGIN
-        SELECT Entity.CategoryID EntityID, Entity.CategoryGUID EntityGuid, Name,ColWidth,Description,SEName,SEKeywords,SEDescription,SETitle,SEAltText,ParentCategoryID ParentEntityID,DisplayOrder,SortByLooks,XmlPackage,Published,isnull(NumProducts, 0) NumObjects, PageSize, QuantityDiscountID, Summary, SkinID, TemplateName
-        FROM dbo.Category Entity with (NOLOCK)
-          left join (SELECT pc.CategoryID, COUNT(pc.ProductID) AS NumProducts
-                     FROM  dbo.ProductCategory pc with (nolock)
-                         join [dbo].Product p with (nolock) on pc.ProductID = p.ProductID  and p.deleted=0 and p.published=1
-                     GROUP BY pc.CategoryID
-                    ) a on Entity.CategoryID = a.CategoryID
-        WHERE Published >= @PublishedOnly and Deleted=0
-        ORDER BY ParentCategoryID,DisplayOrder,Name
-    END
-
-
-
-    IF @EntityName = 'Affiliate' BEGIN
-        SELECT Entity.AffiliateID EntityID,Entity.AffiliateGUID EntityGuid, Name,4 as ColWidth,'' as Description,SEName,SEKeywords,SEDescription,SETitle,SEAltText,ParentAffiliateID ParentEntityID,DisplayOrder,0 as SortByLooks,'' as XmlPackage,Published,isnull(NumProducts, 0) NumObjects, 0 PageSize, 0 QuantityDiscountID, '' Summary, SkinID, TemplateName
-        FROM dbo.Affiliate Entity with (NOLOCK)
-          left join (SELECT pa.AffiliateID, COUNT(pa.ProductID) AS NumProducts
-                     FROM dbo.ProductAffiliate pa with (nolock) join [dbo].Product p with (nolock) on pa.ProductID = p.ProductID and p.deleted=0 and p.published=1
-                     GROUP BY pa.AffiliateID
-                    ) a on Entity.AffiliateID = a.AffiliateID
-        WHERE Published >= @PublishedOnly and Deleted=0
-        ORDER BY ParentAffiliateID, DisplayOrder,Name
-    END
-
-
-
-    IF @EntityName = 'Section' BEGIN
-        SELECT Entity.SectionID EntityID,Entity.SectionGUID EntityGuid,Name,ColWidth,Description,SEName,SEKeywords,SEDescription,SETitle,SEAltText,ParentSectionID ParentEntityID,DisplayOrder,SortByLooks,XmlPackage,Published,isnull(NumProducts, 0) NumObjects
-			   , PageSize, QuantityDiscountID, Summary, SkinID, TemplateName
-        FROM dbo.Section Entity with (NOLOCK)
-            left join (SELECT ps.SectionID, COUNT(ps.ProductID) AS NumProducts
-                       FROM dbo.ProductSection ps with (nolock) join [dbo].Product p with (nolock) on ps.ProductID = p.ProductID and p.deleted=0 and p.published=1
-                       GROUP BY ps.SectionID
-                      ) a on Entity.SectionID = a.SectionID
-        WHERE Published >= @PublishedOnly and Deleted=0
-        ORDER BY ParentSectionID,DisplayOrder,Name
-    END
-
-
-
-    IF @EntityName = 'Manufacturer' BEGIN
-        SELECT Entity.ManufacturerID EntityID,Entity.ManufacturerGUID EntityGuid,Name,ColWidth,Description,SEName,SEKeywords,SEDescription,SETitle,SEAltText,ParentManufacturerID as ParentEntityID,DisplayOrder,0 as SortByLooks,XmlPackage,Published,isnull(NumProducts, 0) NumObjects, PageSize, QuantityDiscountID, Summary, SkinID, TemplateName
-        FROM dbo.Manufacturer Entity with (NOLOCK)
-        left join (SELECT pm.ManufacturerID, COUNT(pm.ProductID) AS NumProducts
-                   FROM dbo.ProductManufacturer pm with (nolock) join [dbo].Product p with (nolock) on pm.ProductID = p.ProductID and p.deleted=0 and p.published=1
-                   GROUP BY pm.ManufacturerID
-                  ) a on Entity.ManufacturerID = a.ManufacturerID
-        WHERE Published >= @PublishedOnly and Deleted=0
-        ORDER BY ParentManufacturerID,DisplayOrder,Name
-    END
-
-
-
-    IF @EntityName = 'Library' BEGIN
-        SELECT Entity.LibraryID EntityID,Entity.LibraryGUID EntityGuid,Name,ColWidth,Description,SEName,SEKeywords,SEDescription,SETitle,SEAltText,ParentLibraryID ParentEntityID,DisplayOrder,SortByLooks,XmlPackage,Published, 0 NumObjects, PageSize, 0 QuantityDiscountID, Summary, SkinID, TemplateName
-        FROM dbo.Library Entity with (NOLOCK)
-        WHERE Published >= @PublishedOnly and Deleted=0
-        ORDER BY ParentLibraryID,DisplayOrder,Name
-    END
-
-
-
-    IF @EntityName = 'Distributor' BEGIN
-        SELECT Entity.DistributorID EntityID,Entity.DistributorGUID EntityGuid,Name,ColWidth,Description,SEName,SEKeywords,SEDescription,SETitle,SEAltText,ParentDistributorID as ParentEntityID,DisplayOrder,0 as SortByLooks,XmlPackage,Published,isnull(NumProducts, 0) NumObjects, PageSize, QuantityDiscountID, Summary, SkinID, TemplateName
-        FROM dbo.Distributor Entity with (NOLOCK)
-        left join (SELECT pd.DistributorID, COUNT(pd.ProductID) AS NumProducts
-                       FROM dbo.ProductDistributor pd with (nolock) join [dbo].Product p with (nolock) on pd.ProductID = p.ProductID and p.deleted=0 and p.published=1
-                       GROUP BY pd.DistributorID
-                      ) a on Entity.DistributorID = a.DistributorID
-        WHERE Published >= @PublishedOnly and Deleted=0
-        ORDER BY ParentDistributorID,DisplayOrder,Name
-    END
-
-
-    IF @EntityName = 'Genre' BEGIN
-        SELECT Entity.GenreID EntityID,Entity.GenreGUID EntityGuid,Name,ColWidth,Description,SEName,SEKeywords,SEDescription,SETitle,SEAltText,ParentGenreID as ParentEntityID,DisplayOrder,0 as SortByLooks,XmlPackage,Published,isnull(NumProducts, 0) NumObjects, PageSize, QuantityDiscountID, Summary, SkinID, TemplateName
-        FROM dbo.Genre Entity with (NOLOCK)
-        left join (SELECT px.GenreID, COUNT(px.ProductID) AS NumProducts
-                       FROM dbo.ProductGenre px with (nolock) join [dbo].Product p with (nolock) on px.ProductID = p.ProductID and p.deleted=0 and p.published=1
-                       GROUP BY px.GenreID
-                      ) a on Entity.GenreID = a.GenreID
-        WHERE Published >= @PublishedOnly and Deleted=0
-        ORDER BY ParentGenreID,DisplayOrder,Name
-    END
-
-    IF @EntityName = 'Vector' BEGIN
-        SELECT Entity.VectorID EntityID,Entity.VectorGUID EntityGuid,Name,ColWidth,Description,SEName,SEKeywords,SEDescription,SETitle,SEAltText,ParentVectorID as ParentEntityID,DisplayOrder,0 as SortByLooks,XmlPackage,Published,isnull(NumProducts, 0) NumObjects, PageSize, QuantityDiscountID, Summary, SkinID, TemplateName
-        FROM dbo.Vector Entity with (NOLOCK)
-        left join (SELECT px2.VectorID, COUNT(px2.ProductID) AS NumProducts
-                       FROM dbo.ProductVector px2 with (nolock) join [dbo].Product p with (nolock) on px2.ProductID = p.ProductID and p.deleted=0 and p.published=1
-                       GROUP BY px2.VectorID
-                      ) a on Entity.VectorID = a.VectorID
-        WHERE Published >= @PublishedOnly and Deleted=0
-        ORDER BY ParentVectorID,DisplayOrder,Name
-    END
-
-
-    IF @EntityName = 'Customerlevel' BEGIN
-        SELECT Entity.CustomerLevelID EntityID,Entity.CustomerLevelGUID EntityGuid,Name, 4 ColWidth, '' Description,SEName, '' SEKeywords, '' SEDescription, '' SETitle, '' SEAltText,ParentCustomerLevelID ParentEntityID,DisplayOrder,0 SortByLooks, '' XmlPackage, 1 Published,isnull(NumProducts, 0) NumObjects, 20 PageSize, 0 QuantityDiscountID, '' Summary, SkinID, TemplateName
-        FROM dbo.CustomerLevel Entity with (NOLOCK)
-          left join (SELECT pc.CustomerLevelID, COUNT(pc.ProductID) AS NumProducts
-                     FROM  dbo.ProductCustomerLevel pc with (nolock)
-                         join [dbo].Product p with (nolock) on pc.ProductID = p.ProductID  and p.deleted=0 and p.published=1
-                     GROUP BY pc.CustomerLevelID
-                    ) a on Entity.CustomerLevelID = a.CustomerLevelID
-        WHERE Deleted=0
-        ORDER BY ParentCustomerLevelID, DisplayOrder,Name
-    END
-END
 GO
 
 --Convert ntext to nvarchar(max) fields
@@ -11718,268 +10702,6 @@ WHERE CustomerID = @CustomerID
 IF @IsAdminCust > 0 and @OldPwd <> @Password
     INSERT dbo.PasswordLog (CustomerID, OldPwd, SaltKey, ChangeDt)
     VALUES (@CustomerID, @OldPwd, @OldSaltKey, getdate())
-
-GO
-
-IF EXISTS (select * from dbo.sysobjects where id = object_id(N'[dbo].aspdnsf_GetCustomerByEmail') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
-    drop proc [dbo].aspdnsf_GetCustomerByEmail
-GO
-
-CREATE PROC [dbo].[aspdnsf_GetCustomerByEmail]
-    @Email nvarchar(100),
-    @filtercustomer bit,
-    @StoreID int = 1,
-    @AdminOnly bit = 0
-AS
-BEGIN
-    SET NOCOUNT ON
-
-    DECLARE @CustomerSessionID int, @LastActivity datetime, @SessionTimeOut varchar(10), @intSessionTimeOut int
-
-    SELECT @LastActivity = '1/1/1900', @CustomerSessionID = -1
-
-    SELECT @SessionTimeOut = ConfigValue FROM dbo.AppConfig with (nolock) WHERE [Name] = 'SessionTimeoutInMinutes'
-
-    IF ISNUMERIC(@SessionTimeOut) = 1
-        set @intSessionTimeOut = convert(int, @SessionTimeOut)
-    ELSE
-        set @intSessionTimeOut = 60
-
-    SELECT  @CustomerSessionID  = cs.CustomerSessionID , @LastActivity = cs.LastActivity
-    FROM dbo.CustomerSession cs with (nolock)
-        join (SELECT max(CustomerSessionID) CustomerSessionID
-              FROM dbo.CustomerSession s with (nolock) join dbo.Customer c with (nolock) on s.CustomerID = c.CustomerID
-              WHERE c.Email = @Email and s.LoggedOut is null and s.LastActivity >= dateadd(mi, -@intSessionTimeOut, getdate())) a on cs.CustomerSessionID = a.CustomerSessionID
-
-    SELECT top 1
-            c.CustomerID, c.CustomerGUID, c.CustomerLevelID, c.RegisterDate, c.Email, c.Password, c.SaltKey, c.DateOfBirth, c.Gender,
-            c.FirstName, c.LastName, c.Notes, c.SkinID, c.Phone, c.AffiliateID, c.Referrer, c.CouponCode, c.OkToEmail,
-            IsAdmin&1 IsAdmin, sign(IsAdmin&2) IsSuperAdmin, c.BillingEqualsShipping, c.LastIPAddress,
-            c.OrderNotes, c.RTShipRequest, c.RTShipResponse, c.OrderOptions, c.LocaleSetting,
-            c.MicroPayBalance, c.RecurringShippingMethodID, c.RecurringShippingMethod, c.BillingAddressID, c.ShippingAddressID,
-            c.CODCompanyCheckAllowed, c.CODNet30Allowed, c.ExtensionData,
-            c.FinalizationData, c.Deleted, c.CreatedOn, c.Over13Checked, c.CurrencySetting,
-            case when isnull(cl.CustomerLevelID, 0) > 0 and cl.LevelHasNoTax = 1 then 2 else c.VATSetting end VATSetting,
-            c.VATRegistrationID, c.StoreCCInDB, c.IsRegistered, c.LockedUntil, c.AdminCanViewCC, c.PwdChanged, c.BadLoginCount,
-            c.LastBadLogin, c.Active, c.PwdChangeRequired, c.SaltKey, isnull(cl.LevelDiscountPercent, 0) LevelDiscountPercent,
-            isnull(cl.LevelDiscountsApplyToExtendedPrices, 0) LevelDiscountsApplyToExtendedPrices, c.RequestedPaymentMethod,
-            @CustomerSessionID CustomerSessionID, @LastActivity LastActivity, c.StoreID, d.Name StoreName
-    FROM dbo.Customer c with (nolock) left join dbo.CustomerLevel cl with (nolock) on c.CustomerLevelID = cl.CustomerLevelID
-    left join Store d with (nolock) on c.StoreID = d.StoreID
-    WHERE c.Deleted=0
-		and c.Email = @Email
-		and ((@filtercustomer = 0 or IsAdmin > 0) or c.StoreID = @StoreID)
-		and (@AdminOnly = 0 or c.IsAdmin > 0)
-    ORDER BY c.IsRegistered desc, c.CreatedOn desc
-END
-
-GO
-
-IF EXISTS (select * from dbo.sysobjects where id = object_id(N'[dbo].aspdnsf_GetCustomerByGUID') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
-    drop proc [dbo].aspdnsf_GetCustomerByGUID
-GO
-
-CREATE proc [dbo].[aspdnsf_GetCustomerByGUID]
-    @CustomerGUID uniqueidentifier
-
-AS
-BEGIN
-    SET NOCOUNT ON
-
-    DECLARE @CustomerSessionID int, @LastActivity datetime, @SessionTimeOut varchar(10), @intSessionTimeOut int
-
-    SELECT @LastActivity = '1/1/1900', @CustomerSessionID = -1
-
-    SELECT @SessionTimeOut = ConfigValue FROM dbo.AppConfig with (nolock) WHERE [Name] = 'SessionTimeoutInMinutes'
-
-    IF ISNUMERIC(@SessionTimeOut) = 1
-        set @intSessionTimeOut = convert(int, @SessionTimeOut)
-    ELSE
-        set @intSessionTimeOut = 60
-
-    SELECT  @CustomerSessionID  = cs.CustomerSessionID , @LastActivity = cs.LastActivity
-    FROM dbo.CustomerSession cs with (nolock)
-        join (SELECT max(CustomerSessionID) CustomerSessionID
-              FROM dbo.CustomerSession s with (nolock) join dbo.Customer c with (nolock) on s.CustomerID = c.CustomerID
-              WHERE c.CustomerGUID = @CustomerGUID and s.LoggedOut is null and s.LastActivity >= dateadd(mi, -@intSessionTimeOut, getdate())) a on cs.CustomerSessionID = a.CustomerSessionID
-
-
-    SELECT top 1
-            c.CustomerID, c.CustomerGUID, c.CustomerLevelID, c.RegisterDate, c.Email, c.Password, c.SaltKey, c.DateOfBirth, c.Gender,
-            c.FirstName, c.LastName, c.Notes, c.SkinID, c.Phone, c.AffiliateID, c.Referrer, c.CouponCode, c.OkToEmail,
-            IsAdmin&1 IsAdmin, sign(IsAdmin&2) IsSuperAdmin, c.BillingEqualsShipping, c.LastIPAddress,
-            c.OrderNotes, c.RTShipRequest, c.RTShipResponse, c.OrderOptions, c.LocaleSetting,
-            c.MicroPayBalance, c.RecurringShippingMethodID, c.RecurringShippingMethod, c.BillingAddressID, c.ShippingAddressID,
-            c.CODCompanyCheckAllowed, c.CODNet30Allowed, c.ExtensionData,
-            c.FinalizationData, c.Deleted, c.CreatedOn, c.Over13Checked, c.CurrencySetting,
-            case when isnull(cl.CustomerLevelID, 0) > 0 and cl.LevelHasNoTax = 1 then 2 else c.VATSetting end VATSetting,
-            c.VATRegistrationID, c.StoreCCInDB, c.IsRegistered, c.LockedUntil, c.AdminCanViewCC, c.PwdChanged, c.BadLoginCount,
-            c.LastBadLogin, c.Active, c.PwdChangeRequired, c.SaltKey, isnull(cl.LevelDiscountPercent, 0) LevelDiscountPercent,
-            isnull(cl.LevelDiscountsApplyToExtendedPrices, 0) LevelDiscountsApplyToExtendedPrices, c.RequestedPaymentMethod,
-            @CustomerSessionID CustomerSessionID, @LastActivity LastActivity, c.StoreID, d.Name StoreName
-    FROM dbo.Customer c with (nolock) left join dbo.CustomerLevel cl with (nolock) on c.CustomerLevelID = cl.CustomerLevelID
-    left join Store d with (nolock) on c.StoreID = d.StoreID
-    WHERE c.Deleted=0 and c.CustomerGUID = @CustomerGUID
-END
-
-GO
-
-IF EXISTS (select * from dbo.sysobjects where id = object_id(N'[dbo].aspdnsf_GetCustomerByID') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
-    drop proc [dbo].aspdnsf_GetCustomerByID
-GO
-
-CREATE proc [dbo].[aspdnsf_GetCustomerByID]
-    @CustomerID int
-
-AS
-BEGIN
-    SET NOCOUNT ON
-
-
-    DECLARE @CustomerSessionID int, @LastActivity datetime, @SessionTimeOut varchar(10), @intSessionTimeOut int
-
-    SELECT @LastActivity = '1/1/1900', @CustomerSessionID = -1
-
-    SELECT @SessionTimeOut = ConfigValue FROM dbo.AppConfig with (nolock) WHERE [Name] = 'SessionTimeoutInMinutes'
-
-    IF ISNUMERIC(@SessionTimeOut) = 1
-        set @intSessionTimeOut = convert(int, @SessionTimeOut)
-    ELSE
-        set @intSessionTimeOut = 60
-
-    SELECT  @CustomerSessionID  = cs.CustomerSessionID , @LastActivity = cs.LastActivity
-    FROM dbo.CustomerSession cs with (nolock)
-        join (SELECT max(CustomerSessionID) CustomerSessionID
-              FROM dbo.CustomerSession s with (nolock) join dbo.Customer c with (nolock) on s.CustomerID = c.CustomerID
-              WHERE c.CustomerID = @CustomerID and s.LoggedOut is null and s.LastActivity >= dateadd(mi, -@intSessionTimeOut, getdate())) a on cs.CustomerSessionID = a.CustomerSessionID
-
-    SELECT top 1
-            c.CustomerID, c.CustomerGUID, c.CustomerLevelID, c.RegisterDate, c.Email, c.Password, c.SaltKey, c.DateOfBirth, c.Gender,
-            c.FirstName, c.LastName, c.Notes, c.SkinID, c.Phone, c.AffiliateID, c.Referrer, c.CouponCode, c.OkToEmail,
-            IsAdmin&1 IsAdmin, sign(IsAdmin&2) IsSuperAdmin, c.BillingEqualsShipping, c.LastIPAddress,
-            c.OrderNotes, c.RTShipRequest, c.RTShipResponse, c.OrderOptions, c.LocaleSetting,
-            c.MicroPayBalance, c.RecurringShippingMethodID, c.RecurringShippingMethod, c.BillingAddressID, c.ShippingAddressID,
-            c.CODCompanyCheckAllowed, c.CODNet30Allowed, c.ExtensionData,
-            c.FinalizationData, c.Deleted, c.CreatedOn, c.Over13Checked, c.CurrencySetting,
-            case when isnull(cl.CustomerLevelID, 0) > 0 and cl.LevelHasNoTax = 1 then 2 else c.VATSetting end VATSetting,
-            c.VATRegistrationID, c.StoreCCInDB, c.IsRegistered, c.LockedUntil, c.AdminCanViewCC, c.PwdChanged, c.BadLoginCount,
-            c.LastBadLogin, c.Active, c.PwdChangeRequired, c.SaltKey, isnull(cl.LevelDiscountPercent, 0) LevelDiscountPercent,
-            isnull(cl.LevelDiscountsApplyToExtendedPrices, 0) LevelDiscountsApplyToExtendedPrices, c.RequestedPaymentMethod,
-            @CustomerSessionID CustomerSessionID,
-            @LastActivity LastActivity, c.StoreID, d.Name StoreName
-    FROM dbo.Customer c with (nolock) left join dbo.CustomerLevel cl with (nolock) on c.CustomerLevelID = cl.CustomerLevelID
-    left join Store d with (nolock) on c.StoreID = d.StoreID
-    WHERE c.Deleted=0 and c.CustomerID = @CustomerID
-END
-
-GO
-
-IF EXISTS (select * from dbo.sysobjects where id = object_id(N'[dbo].aspdnsf_GetShoppingCart') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
-    drop proc [dbo].aspdnsf_GetShoppingCart
-GO
-
-CREATE proc [dbo].[aspdnsf_GetShoppingCart]
-    @CartType tinyint, -- ShoppingCart = 0, WishCart = 1, RecurringCart = 2
-    @CustomerID int,
-    @OriginalRecurringOrderNumber int,
-    @OnlyLoadRecurringItemsThatAreDue tinyint,
-    @StoreID int = 1
-
-
-AS
-BEGIN
-
-    SET NOCOUNT ON
-    declare @filtershoppingcart bit, @filterproduct bit
-    SELECT TOP 1 @filtershoppingcart = ConfigValue FROM GlobalConfig WHERE Name='AllowShoppingcartFiltering'
-    SELECT TOP 1 @filterproduct = ConfigValue FROM GlobalConfig WHERE Name='AllowProductFiltering'
-
-    SELECT
-        ShoppingCart.ProductSKU,
-        ShoppingCart.IsUpsell,
-        ShoppingCart.Notes,
-        ShoppingCart.ExtensionData,
-        ShoppingCart.CustomerEntersPrice,
-        ShoppingCart.NextRecurringShipDate,
-        ShoppingCart.RecurringIndex,
-        ShoppingCart.OriginalRecurringOrderNumber,
-        ShoppingCart.RecurringSubscriptionID,
-        ShoppingCart.CartType,
-        ShoppingCart.ProductPrice,
-        ShoppingCart.ProductWeight,
-        ShoppingCart.ProductDimensions,
-        ShoppingCart.ShoppingCartRecID,
-        ShoppingCart.ProductID,
-        ShoppingCart.VariantID,
-        ShoppingCart.Quantity,
-        ShoppingCart.IsTaxable,
-        ShoppingCart.TaxClassID,
-        ShoppingCart.TaxRate,
-        ShoppingCart.IsShipSeparately,
-        ShoppingCart.ChosenColor,
-        ShoppingCart.ChosenColorSKUModifier,
-        ShoppingCart.ChosenSize,
-        ShoppingCart.ChosenSizeSKUModifier,
-        ShoppingCart.TextOption,
-        ShoppingCart.IsDownload,
-        ShoppingCart.FreeShipping,
-        ShoppingCart.DistributorID,
-        ShoppingCart.DownloadLocation,
-        ShoppingCart.CreatedOn,
-        ShoppingCart.BillingAddressID as ShoppingCartBillingAddressID,
-        ShoppingCart.ShippingAddressID as ShoppingCartShippingAddressID,
-        ShoppingCart.ShippingMethodID,
-        ShoppingCart.ShippingMethod,
-        ShoppingCart.RequiresCount,
-        ShoppingCart.IsSystem,
-        ShoppingCart.IsAKit,
-        ShoppingCart.IsAPack,
-        ShoppingCart.IsGift,
-        Customer.EMail,
-        Customer.OrderOptions,
-        Customer.OrderNotes,
-        Customer.FinalizationData,
-        Customer.CouponCode,
-        Customer.ShippingAddressID as
-        CustomerShippingAddressID,
-        Customer.BillingAddressID as CustomerBillingAddressID,
-        Product.Name as ProductName,
-        Product.IsSystem,
-        ProductVariant.name as VariantName,
-        Product.TextOptionPrompt,
-        Product.SizeOptionPrompt,
-        Product.ColorOptionPrompt,
-        ProductVariant.CustomerEntersPricePrompt,
-        Product.ProductTypeId,
-        Product.TaxClassId,
-        Product.ManufacturerPartNumber,
-        Product.ImageFileNameOverride,
-        Product.SEName,
-        Product.Deleted,
-        ProductVariant.Weight,
-        case @CartType when 2 then ShoppingCart.RecurringInterval else productvariant.RecurringInterval end RecurringInterval,
-        case @CartType when 2 then ShoppingCart.RecurringIntervalType else productvariant.RecurringIntervalType end RecurringIntervalType
-
-    FROM dbo.Customer with (NOLOCK)
-        join dbo.ShoppingCart with (NOLOCK) ON Customer.CustomerID = ShoppingCart.CustomerID
-        join dbo.Product with (NOLOCK) on ShoppingCart.ProductID=Product.ProductID
-        left join dbo.ProductVariant with (NOLOCK) on ShoppingCart.VariantID=ProductVariant.VariantID
-        left join dbo.Address with (NOLOCK) on Customer.ShippingAddressID=Address.AddressID
-        left join dbo.country c on c.name = Address.country
-        left join dbo.State with (nolock) ON Address.State = State.Abbreviation and State.countryid = c.countryid
-		inner join (select distinct a.ProductID,a.StoreID from ShoppingCart a with (nolock) left join ProductStore b with (nolock) on a.ProductID = b.ProductID where (@filterproduct = 0 or a.StoreID = b.StoreID)) productstore
-        on ShoppingCart.ProductID = productstore.ProductID and ShoppingCart.StoreID = productstore.StoreID
-
-    WHERE ShoppingCart.CartType = @CartType
-        and Product.Deleted in (0,2)
-        and ProductVariant.Deleted = 0
-        and Customer.customerid = @CustomerID
-        and (@OriginalRecurringOrderNumber = 0 or ShoppingCart.OriginalRecurringOrderNumber = @OriginalRecurringOrderNumber)
-        and (@OnlyLoadRecurringItemsThatAreDue = 0 or (@CartType = 2 and NextRecurringShipDate < dateadd(dy, 1, getdate())))
-        and (@filtershoppingcart = 0 or ShoppingCart.StoreID = @StoreID)
-     ORDER BY ShoppingCart.ShippingAddressID
-
-END
 
 GO
 
@@ -13216,6 +11938,7 @@ CREATE INDEX [IX_Product_ManufacturerPartNumber] ON [Product](ManufacturerPartNu
 CREATE INDEX [IX_Product_Published_Deleted] ON [Product](Published, Deleted);
 CREATE INDEX [IX_Product_Wholesale_Deleted] ON [Product](Wholesale, Deleted);
 CREATE INDEX [IX_Product_ProductID] ON [ProductCategory](ProductID);
+CREATE NONCLUSTERED INDEX [IX_Product_Published_Deleted_IsAKit] ON [dbo].[Product] ([Published],[Deleted],[IsAKit]) INCLUDE ([ProductID],[Name],[ProductTypeID],[TrackInventoryBySizeAndColor])
 CREATE INDEX [IX_Category_CategoryID] ON [ProductCategory](CategoryID);
 CREATE INDEX [IX_ProductSection_SectionID_DisplayOrder] ON [ProductSection](SectionID, DisplayOrder);
 CREATE INDEX [IX_ProductType_ProductTypeGUID] ON [ProductType](ProductTypeGUID);
@@ -13236,6 +11959,10 @@ CREATE INDEX [IX_ProductVariant_DisplayOrder] ON [ProductVariant](DisplayOrder);
 CREATE INDEX [IX_ProductVariant_Name] ON [ProductVariant](Name);
 CREATE INDEX [IX_ProductVariant_DisplayOrder_Name] ON [ProductVariant](DisplayOrder, Name);
 CREATE INDEX [IX_Profile_CustomerGuid] ON [Profile](CustomerGUID);
+CREATE PRIMARY XML INDEX [XMLIX_Promotions_PromotionRuleData] ON [Promotions](PromotionRuleData)
+CREATE XML INDEX [XMLIX_Promotions_PromotionRuleData_Path] ON [Promotions](PromotionRuleData) USING XML INDEX XMLIX_Promotions_PromotionRuleData FOR PATH
+CREATE PRIMARY XML INDEX [XMLIX_Promotions_PromotionDiscountData] ON [Promotions](PromotionDiscountData)
+CREATE XML INDEX [XMLIX_Promotions_PromotionDiscountData_Path] ON [Promotions](PromotionDiscountData) USING XML INDEX XMLIX_Promotions_PromotionDiscountData FOR PATH
 CREATE UNIQUE INDEX [UIX_QuantityDiscount_QuantityDiscountGUID] ON [QuantityDiscount](QuantityDiscountGUID);
 CREATE INDEX [IX_QuantityDiscount_DisplayOrder] ON [QuantityDiscount](DisplayOrder);
 CREATE INDEX [IX_QuantityDiscount_DisplayOrder_Name] ON [QuantityDiscount](DisplayOrder, Name);
@@ -13502,6 +12229,7 @@ IF NOT EXISTS (SELECT * FROM sys.indexes WHERE object_id = OBJECT_ID(N'[dbo].[Pr
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE object_id = OBJECT_ID(N'[dbo].[Product]') AND name = N'IX_Product_ManufacturerPartNumber') CREATE INDEX [IX_Product_ManufacturerPartNumber] ON [Product](ManufacturerPartNumber);
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE object_id = OBJECT_ID(N'[dbo].[Product]') AND name = N'IX_Product_Published_Deleted') CREATE INDEX [IX_Product_Published_Deleted] ON [Product](Published, Deleted);
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE object_id = OBJECT_ID(N'[dbo].[Product]') AND name = N'IX_Product_Wholesale_Deleted') CREATE INDEX [IX_Product_Wholesale_Deleted] ON [Product](Wholesale, Deleted);
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE object_id = OBJECT_ID(N'[dbo].[Product]') AND name = N'IX_Product_Published_Deleted_IsAKit') CREATE NONCLUSTERED INDEX [IX_Product_Published_Deleted_IsAKit] ON [dbo].[Product] ([Published],[Deleted],[IsAKit]) INCLUDE ([ProductID],[Name],[ProductTypeID],[TrackInventoryBySizeAndColor])
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE object_id = OBJECT_ID(N'[dbo].[ProductCategory]') AND name = N'IX_Product_ProductID') CREATE INDEX [IX_Product_ProductID] ON [ProductCategory](ProductID);
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE object_id = OBJECT_ID(N'[dbo].[ProductCategory]') AND name = N'IX_Category_CategoryID') CREATE INDEX [IX_Category_CategoryID] ON [ProductCategory](CategoryID);
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE object_id = OBJECT_ID(N'[dbo].[ProductSection]') AND name = N'IX_ProductSection_SectionID_DisplayOrder') CREATE INDEX [IX_ProductSection_SectionID_DisplayOrder] ON [ProductSection](SectionID, DisplayOrder);
@@ -13523,6 +12251,10 @@ IF NOT EXISTS (SELECT * FROM sys.indexes WHERE object_id = OBJECT_ID(N'[dbo].[Pr
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE object_id = OBJECT_ID(N'[dbo].[ProductVariant]') AND name = N'IX_ProductVariant_Name') CREATE INDEX [IX_ProductVariant_Name] ON [ProductVariant](Name);
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE object_id = OBJECT_ID(N'[dbo].[ProductVariant]') AND name = N'IX_ProductVariant_DisplayOrder_Name') CREATE INDEX [IX_ProductVariant_DisplayOrder_Name] ON [ProductVariant](DisplayOrder, Name);
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE object_id = OBJECT_ID(N'[dbo].[Profile]') AND name = N'IX_Profile_CustomerGuid') CREATE INDEX [IX_Profile_CustomerGuid] ON [Profile](CustomerGUID);
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE object_id = OBJECT_ID(N'[dbo].[Promotions]') AND name = N'XMLIX_Promotions_PromotionRuleData') CREATE PRIMARY XML INDEX [XMLIX_Promotions_PromotionRuleData] ON [Promotions](PromotionRuleData)
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE object_id = OBJECT_ID(N'[dbo].[Promotions]') AND name = N'XMLIX_Promotions_PromotionRuleData_Path') CREATE XML INDEX [XMLIX_Promotions_PromotionRuleData_Path] ON [Promotions](PromotionRuleData) USING XML INDEX XMLIX_Promotions_PromotionRuleData FOR PATH
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE object_id = OBJECT_ID(N'[dbo].[Promotions]') AND name = N'XMLIX_Promotions_PromotionDiscountData') CREATE PRIMARY XML INDEX [XMLIX_Promotions_PromotionDiscountData] ON [Promotions](PromotionDiscountData)
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE object_id = OBJECT_ID(N'[dbo].[Promotions]') AND name = N'XMLIX_Promotions_PromotionDiscountData_Path') CREATE XML INDEX [XMLIX_Promotions_PromotionDiscountData_Path] ON [Promotions](PromotionDiscountData) USING XML INDEX XMLIX_Promotions_PromotionDiscountData FOR PATH
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE object_id = OBJECT_ID(N'[dbo].[QuantityDiscount]') AND name = N'UIX_QuantityDiscount_QuantityDiscountGUID') CREATE UNIQUE INDEX [UIX_QuantityDiscount_QuantityDiscountGUID] ON [QuantityDiscount](QuantityDiscountGUID);
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE object_id = OBJECT_ID(N'[dbo].[QuantityDiscount]') AND name = N'IX_QuantityDiscount_DisplayOrder') CREATE INDEX [IX_QuantityDiscount_DisplayOrder] ON [QuantityDiscount](DisplayOrder);
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE object_id = OBJECT_ID(N'[dbo].[QuantityDiscount]') AND name = N'IX_QuantityDiscount_DisplayOrder_Name') CREATE INDEX [IX_QuantityDiscount_DisplayOrder_Name] ON [QuantityDiscount](DisplayOrder, Name);
@@ -15635,103 +14367,161 @@ end
 go
 
 -- Use the triggers to populate the localized names table
-PRINT 'Populating LocalizedObjectName table from existing objects'
+print 'Populating LocalizedObjectName table from existing objects'
 declare @localeUpdateChunkSize int = 1000,
 		@localeUpdateIndex int,
 		@localeUpdateCount int
 
-select @localeUpdateCount = count(*), @localeUpdateIndex = 0 from Product
+set nocount on
+
+select @localeUpdateCount = count(*), @localeUpdateIndex = 1 from Product
 while @localeUpdateIndex  < @localeUpdateCount
 begin
-	print '    Updating Products ' + convert(nvarchar(max), @localeUpdateIndex) + ' to ' + convert(nvarchar(max), @localeUpdateIndex + @localeUpdateChunkSize) + ' of ' + convert(nvarchar(max), @localeUpdateCount)
+	print '    Updating Products ' + convert(nvarchar(max), @localeUpdateIndex) + ' to ' + convert(nvarchar(max), @localeUpdateIndex + @localeUpdateChunkSize - 1) + ' of ' + convert(nvarchar(max), @localeUpdateCount)
+	;with CountedRows as (
+		select 
+			ProductId Id,
+			row_number() over (order by ProductID) Ordinal
+		from Product )
 	update Product
 	set Name = Name
-	where ProductID between @localeUpdateIndex and @localeUpdateIndex + @localeUpdateChunkSize
+	from CountedRows
+		inner join Product on CountedRows.Id = Product.ProductID
+	where CountedRows.Ordinal between @localeUpdateIndex and (@localeUpdateIndex + @localeUpdateChunkSize - 1)
 
-	set @localeUpdateIndex = @localeUpdateIndex + @localeUpdateChunkSize + 1
+	set @localeUpdateIndex = @localeUpdateIndex + @localeUpdateChunkSize
 end
 
-select @localeUpdateCount = count(*), @localeUpdateIndex = 0 from ProductVariant
+select @localeUpdateCount = count(*), @localeUpdateIndex = 1 from ProductVariant
 while @localeUpdateIndex  < @localeUpdateCount
 begin
-	print '    Updating Variants ' + convert(nvarchar(max), @localeUpdateIndex) + ' to ' + convert(nvarchar(max), @localeUpdateIndex + @localeUpdateChunkSize) + ' of ' + convert(nvarchar(max), @localeUpdateCount)
+	print '    Updating Variants ' + convert(nvarchar(max), @localeUpdateIndex) + ' to ' + convert(nvarchar(max), @localeUpdateIndex + @localeUpdateChunkSize - 1) + ' of ' + convert(nvarchar(max), @localeUpdateCount)
+	;with CountedRows as (
+		select 
+			VariantID Id,
+			row_number() over (order by VariantID) Ordinal
+		from ProductVariant )
 	update ProductVariant
 	set Name = Name
-	where VariantID between @localeUpdateIndex and @localeUpdateIndex + @localeUpdateChunkSize
+	from CountedRows
+		inner join ProductVariant on CountedRows.Id = ProductVariant.VariantID
+	where CountedRows.Ordinal between @localeUpdateIndex and (@localeUpdateIndex + @localeUpdateChunkSize - 1)
 
-	set @localeUpdateIndex = @localeUpdateIndex + @localeUpdateChunkSize + 1
+	set @localeUpdateIndex = @localeUpdateIndex + @localeUpdateChunkSize
 end
 
-select @localeUpdateCount = count(*), @localeUpdateIndex = 0 from Category
+select @localeUpdateCount = count(*), @localeUpdateIndex = 1 from Category
 while @localeUpdateIndex  < @localeUpdateCount
 begin
-	print '    Updating Categories ' + convert(nvarchar(max), @localeUpdateIndex) + ' to ' + convert(nvarchar(max), @localeUpdateIndex + @localeUpdateChunkSize) + ' of ' + convert(nvarchar(max), @localeUpdateCount)
+	print '    Updating Categories ' + convert(nvarchar(max), @localeUpdateIndex) + ' to ' + convert(nvarchar(max), @localeUpdateIndex + @localeUpdateChunkSize - 1) + ' of ' + convert(nvarchar(max), @localeUpdateCount)
+	;with CountedRows as (
+		select 
+			CategoryId Id,
+			row_number() over (order by CategoryID) Ordinal
+		from Category )
 	update Category
 	set Name = Name
-	where CategoryID between @localeUpdateIndex and @localeUpdateIndex + @localeUpdateChunkSize
+	from CountedRows
+		inner join Category on CountedRows.Id = Category.CategoryID
+	where CountedRows.Ordinal between @localeUpdateIndex and (@localeUpdateIndex + @localeUpdateChunkSize - 1)
 
-	set @localeUpdateIndex = @localeUpdateIndex + @localeUpdateChunkSize + 1
+	set @localeUpdateIndex = @localeUpdateIndex + @localeUpdateChunkSize
 end
 
-select @localeUpdateCount = count(*), @localeUpdateIndex = 0 from Manufacturer
+select @localeUpdateCount = count(*), @localeUpdateIndex = 1 from Manufacturer
 while @localeUpdateIndex  < @localeUpdateCount
 begin
-
-	print '    Updating Manufacturers ' + convert(nvarchar(max), @localeUpdateIndex) + ' to ' + convert(nvarchar(max), @localeUpdateIndex + @localeUpdateChunkSize) + ' of ' + convert(nvarchar(max), @localeUpdateCount)
+	print '    Updating Manufacturers ' + convert(nvarchar(max), @localeUpdateIndex) + ' to ' + convert(nvarchar(max), @localeUpdateIndex + @localeUpdateChunkSize - 1) + ' of ' + convert(nvarchar(max), @localeUpdateCount)
+	;with CountedRows as (
+		select 
+			ManufacturerId Id,
+			row_number() over (order by ManufacturerID) Ordinal
+		from Manufacturer )
 	update Manufacturer
 	set Name = Name
-	where ManufacturerID between @localeUpdateIndex and @localeUpdateIndex + @localeUpdateChunkSize
+	from CountedRows
+		inner join Manufacturer on CountedRows.Id = Manufacturer.ManufacturerID
+	where CountedRows.Ordinal between @localeUpdateIndex and (@localeUpdateIndex + @localeUpdateChunkSize - 1)
 
-	set @localeUpdateIndex = @localeUpdateIndex + @localeUpdateChunkSize + 1
+	set @localeUpdateIndex = @localeUpdateIndex + @localeUpdateChunkSize
 end
 
-select @localeUpdateCount = count(*), @localeUpdateIndex = 0 from Distributor
+select @localeUpdateCount = count(*), @localeUpdateIndex = 1 from Distributor
 while @localeUpdateIndex  < @localeUpdateCount
 begin
-	print '    Updating Distributors ' + convert(nvarchar(max), @localeUpdateIndex) + ' to ' + convert(nvarchar(max), @localeUpdateIndex + @localeUpdateChunkSize) + ' of ' + convert(nvarchar(max), @localeUpdateCount)
+	print '    Updating Distributors ' + convert(nvarchar(max), @localeUpdateIndex) + ' to ' + convert(nvarchar(max), @localeUpdateIndex + @localeUpdateChunkSize - 1) + ' of ' + convert(nvarchar(max), @localeUpdateCount)
+	;with CountedRows as (
+		select 
+			DistributorId Id,
+			row_number() over (order by DistributorID) Ordinal
+		from Distributor )
 	update Distributor
 	set Name = Name
-	where DistributorID between @localeUpdateIndex and @localeUpdateIndex + @localeUpdateChunkSize
+	from CountedRows
+		inner join Distributor on CountedRows.Id = Distributor.DistributorID
+	where CountedRows.Ordinal between @localeUpdateIndex and (@localeUpdateIndex + @localeUpdateChunkSize - 1)
 
-	set @localeUpdateIndex = @localeUpdateIndex + @localeUpdateChunkSize + 1
+	set @localeUpdateIndex = @localeUpdateIndex + @localeUpdateChunkSize
 end
 
-select @localeUpdateCount = count(*), @localeUpdateIndex = 0 from Section
+select @localeUpdateCount = count(*), @localeUpdateIndex = 1 from Section
 while @localeUpdateIndex  < @localeUpdateCount
 begin
-	print '    Updating Sections ' + convert(nvarchar(max), @localeUpdateIndex) + ' to ' + convert(nvarchar(max), @localeUpdateIndex + @localeUpdateChunkSize) + ' of ' + convert(nvarchar(max), @localeUpdateCount)
+	print '    Updating Sections ' + convert(nvarchar(max), @localeUpdateIndex) + ' to ' + convert(nvarchar(max), @localeUpdateIndex + @localeUpdateChunkSize - 1) + ' of ' + convert(nvarchar(max), @localeUpdateCount)
+	;with CountedRows as (
+		select 
+			SectionId Id,
+			row_number() over (order by SectionID) Ordinal
+		from Section )
 	update Section
 	set Name = Name
-	where SectionID between @localeUpdateIndex and @localeUpdateIndex + @localeUpdateChunkSize
+	from CountedRows
+		inner join Section on CountedRows.Id = Section.SectionID
+	where CountedRows.Ordinal between @localeUpdateIndex and (@localeUpdateIndex + @localeUpdateChunkSize - 1)
 
-	set @localeUpdateIndex = @localeUpdateIndex + @localeUpdateChunkSize + 1
+	set @localeUpdateIndex = @localeUpdateIndex + @localeUpdateChunkSize
 end
 
-select @localeUpdateCount = count(*), @localeUpdateIndex = 0 from Genre
+select @localeUpdateCount = count(*), @localeUpdateIndex = 1 from Genre
 while @localeUpdateIndex  < @localeUpdateCount
 begin
-	print '    Updating Genres ' + convert(nvarchar(max), @localeUpdateIndex) + ' to ' + convert(nvarchar(max), @localeUpdateIndex + @localeUpdateChunkSize) + ' of ' + convert(nvarchar(max), @localeUpdateCount)
+	print '    Updating Genres ' + convert(nvarchar(max), @localeUpdateIndex) + ' to ' + convert(nvarchar(max), @localeUpdateIndex + @localeUpdateChunkSize - 1) + ' of ' + convert(nvarchar(max), @localeUpdateCount)
+	;with CountedRows as (
+		select 
+			GenreId Id,
+			row_number() over (order by GenreID) Ordinal
+		from Genre )
 	update Genre
 	set Name = Name
-	where GenreID between @localeUpdateIndex and @localeUpdateIndex + @localeUpdateChunkSize
+	from CountedRows
+		inner join Genre on CountedRows.Id = Genre.GenreID
+	where CountedRows.Ordinal between @localeUpdateIndex and (@localeUpdateIndex + @localeUpdateChunkSize - 1)
 
-	set @localeUpdateIndex = @localeUpdateIndex + @localeUpdateChunkSize + 1
+	set @localeUpdateIndex = @localeUpdateIndex + @localeUpdateChunkSize
 end
 
-select @localeUpdateCount = count(*), @localeUpdateIndex = 0 from Vector
+select @localeUpdateCount = count(*), @localeUpdateIndex = 1 from Vector
 while @localeUpdateIndex  < @localeUpdateCount
 begin
-	print '    Updating Vectors ' + convert(nvarchar(max), @localeUpdateIndex) + ' to ' + convert(nvarchar(max), @localeUpdateIndex + @localeUpdateChunkSize) + ' of ' + convert(nvarchar(max), @localeUpdateCount)
+	print '    Updating Vectors ' + convert(nvarchar(max), @localeUpdateIndex) + ' to ' + convert(nvarchar(max), @localeUpdateIndex + @localeUpdateChunkSize - 1) + ' of ' + convert(nvarchar(max), @localeUpdateCount)
+	;with CountedRows as (
+		select 
+			VectorId Id,
+			row_number() over (order by VectorID) Ordinal
+		from Vector )
 	update Vector
 	set Name = Name
-	where VectorID between @localeUpdateIndex and @localeUpdateIndex + @localeUpdateChunkSize
+	from CountedRows
+		inner join Vector on CountedRows.Id = Vector.VectorID
+	where CountedRows.Ordinal between @localeUpdateIndex and (@localeUpdateIndex + @localeUpdateChunkSize - 1)
 
-	set @localeUpdateIndex = @localeUpdateIndex + @localeUpdateChunkSize + 1
+	set @localeUpdateIndex = @localeUpdateIndex + @localeUpdateChunkSize
 end
 
-PRINT 'LocalizedObjectName creation and population complete'
+print 'LocalizedObjectName creation and population complete'
+set nocount off
 
-GO
+go
 
 /* ==== End Schema-based Localized Object Names ==== */
 
@@ -15828,7 +14618,7 @@ UPDATE AppConfig SET Description = 'If TRUE, AspDotNetStorefront writes out the 
 UPDATE AppConfig SET Description = 'If TRUE, add-to-cart buttons display a warning if shoppers add quantity greater than inventory on-hand. As well, the quantity value reverts to quantity on hand, making it impossible for shoppers to add a greater number than that on hand. Setting this value to FALSE turns off these limitations.' WHERE Name = 'Inventory.LimitCartToQuantityOnHand'
 UPDATE AppConfig SET Description = 'DEPRECATED - this has setting has been left for backwards compatibility, but is no longer being used and will be removed in a future release.' WHERE Name = 'KitCategoryID'
 UPDATE AppConfig SET Description = 'If TRUE, the product name shown within the shopping cart will link directly to the appropriate product page. If FALSE, product names appear only as text.' WHERE Name = 'LinkToProductPageInCart'
-UPDATE AppConfig SET Description = 'The domain of the live site. This is usually merly just domain.com for your site (use your own domain name). If you are on a subdomain, this value should be subdomain.domain.com.' WHERE Name = 'LiveServer'
+UPDATE AppConfig SET Description = 'The domain of the live site. This is usually just domain.com for your site (use your own domain name). If you are on a subdomain, this value should be subdomain.domain.com.' WHERE Name = 'LiveServer'
 UPDATE AppConfig SET Description = 'The e-mail address from which you want your store e-mails sent. Note that customer receipt e-mails use the ReceiptEMailFrom setting.' WHERE Name = 'MailMe_FromAddress'
 UPDATE AppConfig SET Description = 'The name from which your store emails sent, for example, Sally Jane. Note that customer receipt e-mails use the ReceiptEMailFromName setting.' WHERE Name = 'MailMe_FromName'
 UPDATE AppConfig SET Description = 'The e-mail server login password (optional). Consult your e-mail server requirements to determine whether or not a password is required. ' WHERE Name = 'MailMe_Pwd'
@@ -16309,213 +15099,6 @@ if (not exists (select Name from AppConfig where Name='Shipping.Tracking.Usps'))
 /* ======== End Shipping tracking URLs Update ======== */
 GO
 
-
---Update monthly maintenance sproc to clean up orphaned data in the new localization schema
-IF EXISTS (select * from dbo.sysobjects where id = object_id(N'[dbo].aspdnsf_MonthlyMaintenance') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
-    drop proc [dbo].aspdnsf_MonthlyMaintenance
-GO
-
-create proc [dbo].[aspdnsf_MonthlyMaintenance]
---	BACKUP YOUR DB BEFORE USING THIS SCRIPT!
-	@purgeAnonCustomers tinyint = 1,
-	@cleanShoppingCartsOlderThan smallint = 30, -- set to 0 to disable erasing
-	@cleanWishListsOlderThan smallint = 30, -- set to 0 to disable erasing
-	@eraseCCFromAddresses tinyint = 1, -- except those used for recurring billing items!
-	@clearProductViewsOrderThan smallint = 180,
-	@eraseCCFromOrdersOlderThan smallint = 30, -- set to 0 to disable erasing
-	@defragIndexes tinyint = 0,
-	@purgeDeletedRecords tinyint = 0,-- Purges records in all tables with a deleted flag set to 1
-	@removeRTShippingDataOlderThan smallint = 30, -- set to 0 to disable erasing
-	@clearSearchLogOlderThan smallint = 30,-- set to 0 to disable erasing
-	@cleanOrphanedLocalizedNames tinyint = 0
-as
-begin
-	set nocount on
-
-	-- Clear out failed transactions older than 2 months:
-	delete from FailedTransaction where OrderDate < dateadd(mm,-2,getdate());
-
-	-- Clear out old tx info, not longer needed:
-	update orders set TransactionCommand=NULL, AuthorizationResult=NULL, VoidTXCommand=NULL, VoidTXResult=NULL, CaptureTXCommand=NULL, CaptureTXResult=NULL, RefundTXCommand=NULL, RefundTXResult=NULL where orderdate < dateadd(mm,-2,getdate());
-
-	-- Clean up data in the LocalizedObjectName table for locales that no longer exist
-	if @cleanOrphanedLocalizedNames = 1
-	begin
-		delete from LocalizedObjectName where LocaleId not in (select LocaleSettingID from LocaleSetting);
-	end
-
-	-- clean up all carts (don't touch recurring items or wishlist items however):
-	if @cleanShoppingCartsOlderThan <> 0
-	begin
-		delete dbo.kitcart where (CartType=0 or CartType=101) and CreatedOn < dateadd(d,-@cleanShoppingCartsOlderThan,getdate());
-		delete dbo.ShoppingCart where (CartType=0 or CartType=101) and CreatedOn < dateadd(d,-@cleanShoppingCartsOlderThan,getdate());
-	end
-
-	if @cleanWishListsOlderThan <> 0
-	begin
-		delete dbo.kitcart where CartType=1 and CreatedOn < dateadd(d,-@cleanWishListsOlderThan,getdate());
-		delete dbo.ShoppingCart where CartType=1 and CreatedOn < dateadd(d,-@cleanWishListsOlderThan,getdate());
-	end
-
-	-- purge anon customers:
-	if @purgeAnonCustomers = 1
-	begin
-		-- clean out CIM profiles for orders that were not completed
-		delete dbo.CIM_AddressPaymentProfileMap where customerid not in (select customerid from dbo.customer with (NOLOCK) where IsRegistered=1)
-
-		delete dbo.customer where 
-			IsRegistered=0 and IsAdmin = 0
-			and customerid not in (select customerid from dbo.ShoppingCart with (NOLOCK))
-			and customerid not in (select customerid from dbo.kitcart with (NOLOCK))
-			and customerid not in (select customerid from dbo.orders with (NOLOCK))
-			and customerid not in (select customerid from dbo.rating with (NOLOCK))
-			and customerid not in (select ratingcustomerid from dbo.ratingcommenthelpfulness with (NOLOCK))
-			and customerid not in (select votingcustomerid from dbo.ratingcommenthelpfulness with (NOLOCK))
-	end
-
-	-- clean addresses, except for those that have recurring orders
-	if @eraseCCFromAddresses = 1
-		update [dbo].address set 
-			CardNumber=NULL,
-			CardStartDate=NULL,
-			CardIssueNumber=NULL,
-			CardExpirationMonth=NULL,
-			CardExpirationYear=NULL,
-			eCheckBankABACode=NULL,
-			eCheckBankAccountNumber=NULL
-		where CustomerID not in (select CustomerID from ShoppingCart where CartType=2)
-
-	-- erase credit cards from all orders older than N days:
-	if @eraseCCFromOrdersOlderThan <> 0
-		update [dbo].orders set CardNumber=NULL, eCheckBankABACode=NULL,eCheckBankAccountNumber=NULL
-		where
-			OrderDate < dateadd(d,-@eraseCCFromOrdersOlderThan,getdate())
-
-	-- erase product views both for dynamic
-	if @clearProductViewsOrderThan <> 0
-	begin
-		delete dbo.ProductView where ViewDate < dateadd(d,-@clearProductViewsOrderThan,getdate())
-	end
-
-	-- Nuke deleted stores
-	declare @storeId int
-	select top 1 @storeId = StoreID from Store where Deleted = 1
-	while @@rowcount > 0 begin
-		exec aspdnsf_NukeStore @storeId, 0
-		select top 1 @storeId = StoreID from Store where Deleted = 1
-	end
-
-	if @purgeDeletedRecords = 1 begin
-		delete dbo.Address where deleted = 1
-		delete dbo.Coupon where deleted = 1
-		delete dbo.Customer where deleted = 1
-		delete dbo.Document where deleted = 1
-		delete dbo.News where deleted = 1
-		delete dbo.Product where deleted = 1
-		delete dbo.ProductVariant where deleted = 1 or not exists (select * from dbo.Product where productid = ProductVariant.productid)
-		delete dbo.SalesPrompt where deleted = 1
-		delete dbo.ShippingZone where deleted = 1
-		delete dbo.Topic where deleted = 1
-		delete dbo.Affiliate where deleted = 1
-		delete dbo.Category where deleted = 1
-		delete dbo.CustomerLevel where deleted = 1
-		delete dbo.Distributor where deleted = 1
-		delete dbo.Genre where deleted = 1
-		delete dbo.Library where deleted = 1
-		delete dbo.Manufacturer where deleted = 1
-		delete dbo.Section where deleted = 1
-		delete dbo.Vector where deleted = 1
-		delete dbo.ProductVector where not exists (select * from dbo.product where productid = ProductVector.productid) or not exists (select * from dbo.vector where vectorid = ProductVector.vectorid)
-		delete dbo.ProductAffiliate where not exists (select * from dbo.product where productid = ProductAffiliate.productid) or not exists (select * from dbo.Affiliate where Affiliateid = ProductAffiliate.Affiliateid)
-		delete dbo.ProductCategory where not exists (select * from dbo.product where productid = ProductCategory.productid) or not exists (select * from dbo.Category where Categoryid = ProductCategory.Categoryid)
-		delete dbo.ProductCustomerLevel where not exists (select * from dbo.product where productid = ProductCustomerLevel.productid) or not exists (select * from dbo.CustomerLevel where CustomerLevelid = ProductCustomerLevel.CustomerLevelid)
-		delete dbo.ProductDistributor where not exists (select * from dbo.product where productid = ProductDistributor.productid) or not exists (select * from dbo.Distributor where Distributorid = ProductDistributor.Distributorid)
-		delete dbo.ProductGenre where not exists (select * from dbo.product where productid = ProductGenre.productid) or not exists (select * from dbo.Genre where Genreid = ProductGenre.Genreid)
-		delete dbo.ProductLocaleSetting where not exists (select * from dbo.product where productid = ProductLocaleSetting.productid) or not exists (select * from dbo.LocaleSetting where LocaleSettingid = ProductLocaleSetting.LocaleSettingid)
-		delete dbo.ProductManufacturer where not exists (select * from dbo.product where productid = ProductManufacturer.productid) or not exists (select * from dbo.Manufacturer where Manufacturerid = ProductManufacturer.Manufacturerid)
-		delete dbo.ProductSection where not exists (select * from dbo.product where productid = ProductSection.productid) or not exists (select * from dbo.Section where Sectionid = ProductSection.Sectionid)
-	end
-
-	-- Clear out all customer sessions
-	truncate table CustomerSession
-
-	-- Clean up abandon records tied to customers that no longer exist
-	delete from dbo.ShoppingCart where CustomerID not in (select distinct CustomerID from Customer);
-	delete from dbo.KitCart where ShoppingCartRecID not in (select distinct ShoppingCartRecID from ShoppingCart);
-	delete from dbo.CustomerSession where CustomerID not in (select distinct CustomerID from Customer);
-	delete from dbo.RatingCommentHelpfulness where RatingCustomerID not in (select distinct CustomerID from Customer);
-	delete from dbo.RatingCommentHelpfulness where VotingCustomerID not in (select distinct CustomerID from Customer);
-	delete from dbo.PromotionUsage where CustomerID not in (select distinct CustomerID from Customer);
-	delete from dbo.Address where CustomerID not in (select distinct CustomerID from Customer);
-	delete from dbo.Rating where CustomerID not in (select distinct CustomerID from Customer);
-
-	-- Remove old rtshipping requests and responses
-	if @removeRTShippingDataOlderThan <> 0
-	begin
-		update dbo.Customer set RTShipRequest = '', RTShipResponse = ''
-		where CreatedOn < dateadd(d,-@removeRTShippingDataOlderThan,getdate())
-
-		update dbo.Orders set RTShipRequest = '', RTShipResponse = ''
-		where OrderDate < dateadd(d,-@removeRTShippingDataOlderThan,getdate())
-	end
-
-	-- Search log
-	if @clearSearchLogOlderThan <> 0
-	begin
-		delete from dbo.SearchLog where CreatedOn < dateadd(d,-@clearSearchLogOlderThan,getdate())
-	end
-
-	-- Defrag indexes
-	if @defragIndexes = 1
-	begin
-		create table #SHOWCONTIG (
-			tblname varchar (255),
-			ObjectId int,
-			IndexName varchar (255),
-			IndexId int,
-			Lvl int,
-			CountPages int,
-			CountRows int,
-			MinRecSize int,
-			MaxRecSize int,
-			AvgRecSize int,
-			ForRecCount int,
-			Extents int,
-			ExtentSwitches int,
-			AvgFreeBytes int,
-			AvgPageDensity int,
-			ScanDensity decimal,
-			BestCount int,
-			ActualCount int,
-			LogicalFrag decimal,
-			ExtentFrag decimal)
-
-		select [name] tblname into #tmp from dbo.sysobjects with (nolock) where type = 'u' order by Name
-		
-		declare @cmd varchar(max)
-		declare @tblname varchar(255), @indexname varchar(255)
-		select top 1 @tblname = tblname from #tmp
-		while @@rowcount > 0 begin
-			set @cmd = 'DBCC SHOWCONTIG (''' + @tblname + ''') with tableresults, ALL_INDEXES'
-			insert #SHOWCONTIG
-			exec (@cmd)
-			delete #tmp where tblname = @tblname
-			select top 1 @tblname = tblname from #tmp
-		end
-
-		delete #SHOWCONTIG where LogicalFrag < 5 or Extents = 1 or IndexId in (0, 255)
-
-		select top 1 @tblname = tblname, @indexname = IndexName from #SHOWCONTIG order by IndexId
-		while @@rowcount > 0 begin
-			set @cmd = 'DBCC DBREINDEX (''' + @tblname + ''', ''' + @indexname + ''', 90)  '
-			exec (@cmd)
-			delete #SHOWCONTIG where tblname = @tblname
-			select top 1 @tblname = tblname, @indexname = IndexName from #SHOWCONTIG order by IndexId
-		end
-	end
-end
-go
-
 if exists(select * from sys.objects where name = 'aspdnsf_CustomerConsistencyCheck')
 	drop proc dbo.aspdnsf_CustomerConsistencyCheck
 GO
@@ -16715,6 +15298,1663 @@ where
 
 /*********** End 9.5.0.0 Changes *********************/
 
+/*********** Start 9.5.1.0 Changes *********************/
+--New session timeout handling
+if not exists(select * from AppConfig Where Name='SessionTimeoutLandingPage')
+	insert into [AppConfig] (AppConfigGUID, StoreID, Name, Description, ConfigValue, ValueType, AllowableValues, GroupName, SuperOnly, Hidden, CreatedOn) 
+	values(newid(), 0, 'SessionTimeoutLandingPage', 'When customers'' sessions end due to idleness, they will be sent to this page on your site.', 'default.aspx', 'string', null, 'SECURITY', 1, 0, getdate());
+
+if not exists(select * from AppConfig Where Name='AdminSessionTimeoutInMinutes')
+	insert into [AppConfig] (AppConfigGUID, StoreID, Name, Description, ConfigValue, ValueType, AllowableValues, GroupName, SuperOnly, Hidden, CreatedOn) 
+	values(newid(), 0, 'AdminSessionTimeoutInMinutes', 'Admin session data timeout value. Default is 15 minutes', '15', 'integer', null, 'SECURITY', 1, 0, getdate());
+	
+if not exists(select * from AppConfig Where Name='SessionTimeoutWarning.Enabled')
+	insert into [AppConfig] (AppConfigGUID, StoreID, Name, Description, ConfigValue, ValueType, AllowableValues, GroupName, SuperOnly, Hidden, CreatedOn) 
+	values(newid(), 0, 'SessionTimeoutWarning.Enabled', 'If true, customers will get a warning before their sessions time out due to inactivity.', 'true', 'boolean', null, 'SECURITY', 1, 0, getdate());
+
+if not exists(select * from Topic Where Name='SessionExpired')
+INSERT [dbo].Topic(Name, HTMLOK, ShowInSiteMap,Title, Description) values('SessionExpired', 1, 0, 'SessionExpired', '<div class="session-warning-top-line">
+																														We want to keep you safe!
+																														</div>
+																														<div class="session-warning-middle-line">
+																														Just in case you walked away and left your screen turned on, we have expired this session.
+																														</div>
+																														<div class="session-warning-bottom-line">
+																														Just click OK to continue.
+																														</div>')
+																														
+if not exists(select * from Topic Where Name='SessionExpiring')
+INSERT [dbo].Topic(Name, HTMLOK, ShowInSiteMap,Title, Description) values('SessionExpiring', 1, 0, 'SessionExpiring', '<div class="session-warning-top-line">
+																														We want to keep you safe!
+																														</div>
+																														<div class="session-warning-middle-line">
+																														Due to inactivity, your session will soon expire.
+																														</div>
+																														<div class="session-warning-bottom-line">
+																														Just click OK to continue.
+																														</div>')
+
+--Customer & session lookup sprocs
+IF EXISTS (select * from dbo.sysobjects where id = object_id(N'[dbo].aspdnsf_GetCustomerByGUID') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
+    drop proc [dbo].aspdnsf_GetCustomerByGUID
+GO
+create proc [dbo].[aspdnsf_GetCustomerByGUID]
+    @CustomerGUID uniqueidentifier
+
+AS
+BEGIN
+    SET NOCOUNT ON
+
+    DECLARE @CustomerSessionID int = -1, @LastActivity datetime = '1/1/1900'
+
+    SELECT  @CustomerSessionID  = cs.CustomerSessionID , @LastActivity = cs.LastActivity
+    FROM dbo.CustomerSession cs with (nolock)
+		LEFT JOIN dbo.Customer c with (nolock) on cs.CustomerID = c.CustomerID
+              WHERE c.CustomerGUID = @CustomerGUID
+
+    SELECT top 1
+            c.CustomerID, c.CustomerGUID, c.CustomerLevelID, c.RegisterDate, c.Email, c.Password, c.SaltKey, c.DateOfBirth, c.Gender,
+            c.FirstName, c.LastName, c.Notes, c.SkinID, c.Phone, c.AffiliateID, c.Referrer, c.CouponCode, c.OkToEmail,
+            IsAdmin&1 IsAdmin, sign(IsAdmin&2) IsSuperAdmin, c.BillingEqualsShipping, c.LastIPAddress,
+            c.OrderNotes, c.RTShipRequest, c.RTShipResponse, c.OrderOptions, c.LocaleSetting,
+            c.MicroPayBalance, c.RecurringShippingMethodID, c.RecurringShippingMethod, c.BillingAddressID, c.ShippingAddressID,
+            c.CODCompanyCheckAllowed, c.CODNet30Allowed, c.ExtensionData,
+            c.FinalizationData, c.Deleted, c.CreatedOn, c.Over13Checked, c.CurrencySetting,
+            case when isnull(cl.CustomerLevelID, 0) > 0 and cl.LevelHasNoTax = 1 then 2 else c.VATSetting end VATSetting,
+            c.VATRegistrationID, c.StoreCCInDB, c.IsRegistered, c.LockedUntil, c.AdminCanViewCC, c.PwdChanged, c.BadLoginCount,
+            c.LastBadLogin, c.Active, c.PwdChangeRequired, c.SaltKey, isnull(cl.LevelDiscountPercent, 0) LevelDiscountPercent,
+            isnull(cl.LevelDiscountsApplyToExtendedPrices, 0) LevelDiscountsApplyToExtendedPrices, c.RequestedPaymentMethod,
+            @CustomerSessionID CustomerSessionID, @LastActivity LastActivity, c.StoreID, d.Name StoreName
+    FROM dbo.Customer c with (nolock) left join dbo.CustomerLevel cl with (nolock) on c.CustomerLevelID = cl.CustomerLevelID
+    left join Store d with (nolock) on c.StoreID = d.StoreID
+    WHERE c.Deleted=0 and c.CustomerGUID = @CustomerGUID
+END
+GO
+
+IF EXISTS (select * from dbo.sysobjects where id = object_id(N'[dbo].aspdnsf_GetCustomerByID') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
+    drop proc [dbo].aspdnsf_GetCustomerByID
+GO
+create proc [dbo].[aspdnsf_GetCustomerByID]
+    @CustomerID int
+
+AS
+BEGIN
+    SET NOCOUNT ON
+
+    DECLARE @CustomerSessionID int = -1, @LastActivity datetime = '1/1/1900'
+
+    SELECT  @CustomerSessionID  = cs.CustomerSessionID , @LastActivity = cs.LastActivity
+    FROM dbo.CustomerSession cs with (nolock)
+    WHERE cs.CustomerID = @CustomerID
+
+    SELECT top 1
+            c.CustomerID, c.CustomerGUID, c.CustomerLevelID, c.RegisterDate, c.Email, c.Password, c.SaltKey, c.DateOfBirth, c.Gender,
+            c.FirstName, c.LastName, c.Notes, c.SkinID, c.Phone, c.AffiliateID, c.Referrer, c.CouponCode, c.OkToEmail,
+            IsAdmin&1 IsAdmin, sign(IsAdmin&2) IsSuperAdmin, c.BillingEqualsShipping, c.LastIPAddress,
+            c.OrderNotes, c.RTShipRequest, c.RTShipResponse, c.OrderOptions, c.LocaleSetting,
+            c.MicroPayBalance, c.RecurringShippingMethodID, c.RecurringShippingMethod, c.BillingAddressID, c.ShippingAddressID,
+            c.CODCompanyCheckAllowed, c.CODNet30Allowed, c.ExtensionData,
+            c.FinalizationData, c.Deleted, c.CreatedOn, c.Over13Checked, c.CurrencySetting,
+            case when isnull(cl.CustomerLevelID, 0) > 0 and cl.LevelHasNoTax = 1 then 2 else c.VATSetting end VATSetting,
+            c.VATRegistrationID, c.StoreCCInDB, c.IsRegistered, c.LockedUntil, c.AdminCanViewCC, c.PwdChanged, c.BadLoginCount,
+            c.LastBadLogin, c.Active, c.PwdChangeRequired, c.SaltKey, isnull(cl.LevelDiscountPercent, 0) LevelDiscountPercent,
+            isnull(cl.LevelDiscountsApplyToExtendedPrices, 0) LevelDiscountsApplyToExtendedPrices, c.RequestedPaymentMethod,
+            @CustomerSessionID CustomerSessionID,
+            @LastActivity LastActivity, c.StoreID, d.Name StoreName
+    FROM dbo.Customer c with (nolock) left join dbo.CustomerLevel cl with (nolock) on c.CustomerLevelID = cl.CustomerLevelID
+    left join Store d with (nolock) on c.StoreID = d.StoreID
+    WHERE c.Deleted=0 and c.CustomerID = @CustomerID
+END
+GO
+
+IF EXISTS (select * from dbo.sysobjects where id = object_id(N'[dbo].aspdnsf_GetCustomerByEmail') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
+    drop proc [dbo].aspdnsf_GetCustomerByEmail
+GO
+CREATE PROC [dbo].[aspdnsf_GetCustomerByEmail]
+    @Email nvarchar(100),
+    @FilterCustomer bit,
+    @StoreID int = 1,
+    @AdminOnly bit = 0
+AS
+BEGIN
+    SET NOCOUNT ON
+
+    DECLARE @CustomerSessionID int = -1, @LastActivity datetime = '1/1/1900'
+
+    SELECT  @CustomerSessionID  = cs.CustomerSessionID, @LastActivity = cs.LastActivity
+    FROM dbo.CustomerSession cs with (nolock)
+		LEFT JOIN dbo.Customer c with (nolock) on cs.CustomerID = c.CustomerID
+    WHERE c.Email = @Email
+		and (@FilterCustomer = 0 or c.StoreID = @StoreID)
+		and (@AdminOnly = 0 or c.IsAdmin > 0)
+
+    SELECT top 1
+            c.CustomerID, c.CustomerGUID, c.CustomerLevelID, c.RegisterDate, c.Email, c.Password, c.SaltKey, c.DateOfBirth, c.Gender,
+            c.FirstName, c.LastName, c.Notes, c.SkinID, c.Phone, c.AffiliateID, c.Referrer, c.CouponCode, c.OkToEmail,
+            IsAdmin&1 IsAdmin, sign(IsAdmin&2) IsSuperAdmin, c.BillingEqualsShipping, c.LastIPAddress,
+            c.OrderNotes, c.RTShipRequest, c.RTShipResponse, c.OrderOptions, c.LocaleSetting,
+            c.MicroPayBalance, c.RecurringShippingMethodID, c.RecurringShippingMethod, c.BillingAddressID, c.ShippingAddressID,
+            c.CODCompanyCheckAllowed, c.CODNet30Allowed, c.ExtensionData,
+            c.FinalizationData, c.Deleted, c.CreatedOn, c.Over13Checked, c.CurrencySetting,
+            case when isnull(cl.CustomerLevelID, 0) > 0 and cl.LevelHasNoTax = 1 then 2 else c.VATSetting end VATSetting,
+            c.VATRegistrationID, c.StoreCCInDB, c.IsRegistered, c.LockedUntil, c.AdminCanViewCC, c.PwdChanged, c.BadLoginCount,
+            c.LastBadLogin, c.Active, c.PwdChangeRequired, c.SaltKey, isnull(cl.LevelDiscountPercent, 0) LevelDiscountPercent,
+            isnull(cl.LevelDiscountsApplyToExtendedPrices, 0) LevelDiscountsApplyToExtendedPrices, c.RequestedPaymentMethod,
+            @CustomerSessionID CustomerSessionID, @LastActivity LastActivity, c.StoreID, d.Name StoreName
+    FROM dbo.Customer c with (nolock) left join dbo.CustomerLevel cl with (nolock) on c.CustomerLevelID = cl.CustomerLevelID
+    left join Store d with (nolock) on c.StoreID = d.StoreID
+    WHERE c.Deleted=0
+		and c.Email = @Email
+		and ((@filtercustomer = 0 or IsAdmin > 0) or c.StoreID = @StoreID)
+		and (@AdminOnly = 0 or c.IsAdmin > 0)
+    ORDER BY c.IsRegistered desc, c.CreatedOn desc
+END
+GO
+
+IF EXISTS (select * from dbo.sysobjects where id = object_id(N'[dbo].aspdnsf_SessionGetByID') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
+    drop proc [dbo].[aspdnsf_SessionGetByID]
+GO
+create proc [dbo].[aspdnsf_SessionGetByID]
+    @CustomerSessionID int
+
+AS
+SET NOCOUNT ON
+
+SELECT CustomerSessionID, CustomerSessionGUID, CustomerID, SessionName, SessionValue, CreatedOn, ExpiresOn, ipaddr, LastActivity, LoggedOut
+FROM dbo.Customersession
+WHERE CustomerSessionID = @CustomerSessionID
+GO
+
+IF EXISTS (select * from dbo.sysobjects where id = object_id(N'[dbo].aspdnsf_SessionGetByCustomerID') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
+    drop proc [dbo].[aspdnsf_SessionGetByCustomerID]
+GO
+create proc [dbo].[aspdnsf_SessionGetByCustomerID]
+    @CustomerID int
+
+AS
+SET NOCOUNT ON
+
+DECLARE @CustomerSessionID int
+
+select @CustomerSessionID = max(CustomerSessionID)
+from dbo.Customersession with (nolock)
+WHERE CustomerID = @CustomerID
+
+SELECT cs.CustomerSessionID, cs.CustomerSessionGUID, cs.CustomerID, cs.SessionName, cs.SessionValue, cs.CreatedOn, cs.ExpiresOn, cs.ipaddr, cs.LastActivity, cs.LoggedOut
+FROM dbo.Customersession cs with (nolock)
+WHERE CustomerSessionID = @CustomerSessionID
+GO
+
+IF EXISTS (select * from dbo.sysobjects where id = object_id(N'[dbo].aspdnsf_SessionGetByGUID') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
+    drop proc [dbo].[aspdnsf_SessionGetByGUID]
+GO
+
+--get_ShoppingCart tuning
+IF EXISTS (select * from dbo.sysobjects where id = object_id(N'[dbo].aspdnsf_GetShoppingCart') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
+    drop proc [dbo].aspdnsf_GetShoppingCart
+GO
+
+create proc [dbo].[aspdnsf_GetShoppingCart]
+    @CartType tinyint, -- ShoppingCart = 0, WishCart = 1, RecurringCart = 2
+    @CustomerID int,
+    @OriginalRecurringOrderNumber int,
+    @OnlyLoadRecurringItemsThatAreDue tinyint,
+    @StoreID int = 1
+
+AS
+BEGIN
+    SET NOCOUNT ON
+    declare @FilterShoppingCart bit, @FilterProduct bit
+	SELECT TOP 1 @FilterShoppingCart = ConfigValue FROM GlobalConfig WHERE Name='AllowShoppingcartFiltering'
+    SELECT TOP 1 @FilterProduct = ConfigValue FROM GlobalConfig WHERE Name='AllowProductFiltering'
+
+    SELECT
+        ShoppingCart.ProductSKU,
+        ShoppingCart.IsUpsell,
+        ShoppingCart.Notes,
+        ShoppingCart.ExtensionData,
+        ShoppingCart.CustomerEntersPrice,
+        ShoppingCart.NextRecurringShipDate,
+        ShoppingCart.RecurringIndex,
+        ShoppingCart.OriginalRecurringOrderNumber,
+        ShoppingCart.RecurringSubscriptionID,
+        ShoppingCart.CartType,
+        ShoppingCart.ProductPrice,
+        ShoppingCart.ProductWeight,
+        ShoppingCart.ProductDimensions,
+        ShoppingCart.ShoppingCartRecID,
+        ShoppingCart.ProductID,
+        ShoppingCart.VariantID,
+        ShoppingCart.Quantity,
+        ShoppingCart.IsTaxable,
+        ShoppingCart.TaxClassID,
+        ShoppingCart.TaxRate,
+        ShoppingCart.IsShipSeparately,
+        ShoppingCart.ChosenColor,
+        ShoppingCart.ChosenColorSKUModifier,
+        ShoppingCart.ChosenSize,
+        ShoppingCart.ChosenSizeSKUModifier,
+        ShoppingCart.TextOption,
+        ShoppingCart.IsDownload,
+        ShoppingCart.FreeShipping,
+        ShoppingCart.DistributorID,
+        ShoppingCart.DownloadLocation,
+        ShoppingCart.CreatedOn,
+        ShoppingCart.BillingAddressID as ShoppingCartBillingAddressID,
+        ShoppingCart.ShippingAddressID as ShoppingCartShippingAddressID,
+        ShoppingCart.ShippingMethodID,
+        ShoppingCart.ShippingMethod,
+        ShoppingCart.RequiresCount,
+        ShoppingCart.IsSystem,
+        ShoppingCart.IsAKit,
+        ShoppingCart.IsAPack,
+        ShoppingCart.IsGift,
+        Customer.EMail,
+        Customer.OrderOptions,
+        Customer.OrderNotes,
+        Customer.FinalizationData,
+        Customer.CouponCode,
+        Customer.ShippingAddressID as
+        CustomerShippingAddressID,
+        Customer.BillingAddressID as CustomerBillingAddressID,
+        Product.Name as ProductName,
+        Product.IsSystem,
+        ProductVariant.name as VariantName,
+        Product.TextOptionPrompt,
+        Product.SizeOptionPrompt,
+        Product.ColorOptionPrompt,
+        ProductVariant.CustomerEntersPricePrompt,
+        Product.ProductTypeId,
+        Product.TaxClassId,
+        Product.ManufacturerPartNumber,
+        Product.ImageFileNameOverride,
+        Product.SEName,
+        Product.Deleted,
+        ProductVariant.Weight,
+        case @CartType when 2 then ShoppingCart.RecurringInterval else productvariant.RecurringInterval end RecurringInterval,
+        case @CartType when 2 then ShoppingCart.RecurringIntervalType else productvariant.RecurringIntervalType end RecurringIntervalType
+
+    FROM dbo.Customer with (NOLOCK)
+        join dbo.ShoppingCart with (NOLOCK) ON Customer.CustomerID = ShoppingCart.CustomerID
+        join dbo.Product with (NOLOCK) on ShoppingCart.ProductID=Product.ProductID
+        left join dbo.ProductVariant with (NOLOCK) on ShoppingCart.VariantID=ProductVariant.VariantID
+        left join dbo.Address with (NOLOCK) on Customer.ShippingAddressID=Address.AddressID
+		inner join (select distinct a.ProductID,a.StoreID from ShoppingCart a with (nolock) left join ProductStore b with (nolock) on a.ProductID = b.ProductID and (@FilterProduct = 0 or a.StoreID = b.StoreID)) productstore
+        on ShoppingCart.ProductID = productstore.ProductID and ShoppingCart.StoreID = productstore.StoreID
+
+    WHERE ShoppingCart.CartType = @CartType
+        and Product.Deleted in (0,2)
+        and ProductVariant.Deleted = 0
+        and Customer.customerid = @CustomerID
+        and (@OriginalRecurringOrderNumber = 0 or ShoppingCart.OriginalRecurringOrderNumber = @OriginalRecurringOrderNumber)
+        and (@OnlyLoadRecurringItemsThatAreDue = 0 or (@CartType = 2 and NextRecurringShipDate < dateadd(dy, 1, getdate())))
+        and (@FilterShoppingCart = 0 or ShoppingCart.StoreID = @StoreID)
+END
+GO
+
+--getProducts tuning
+IF EXISTS (select * from dbo.sysobjects where id = object_id(N'[dbo].aspdnsf_GetProducts') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
+    drop proc [dbo].[aspdnsf_GetProducts]
+GO
+
+CREATE proc [dbo].[aspdnsf_GetProducts]
+    @categoryID      int = null,
+    @sectionID       int = null,
+    @manufacturerID  int = null,
+    @distributorID   int = null,
+    @genreID         int = null,
+    @vectorID        int = null,
+    @localeID        int = null,
+    @CustomerLevelID int = null,
+    @affiliateID     int = null,
+    @ProductTypeID   int = null,
+    @ViewType        bit = 1, -- 0 = all variants, 1 = one variant
+    @sortEntity      int = 0, -- 1 = category, 2 = section, 3 = manufacturer, 4 = distributor, 5= genre, 6 = vector
+    @pagenum         int = 1,
+    @pagesize        int = null,
+    @StatsFirst      tinyint = 1,
+    @searchstr       nvarchar(4000) = null,
+    @extSearch       tinyint = 0,
+    @publishedonly   tinyint = 0,
+    @ExcludeKits     tinyint = 0,
+    @ExcludeSysProds tinyint = 0,
+    @InventoryFilter int = 0,  --  will only show products with an inventory level GREATER OR EQUAL TO than the number specified in this parameter, set to -1 to disable inventory filtering
+    @sortEntityName  varchar(20) = '', -- usely only when the entity id is provided, allowed values: category, section, manufacturer, distributor, genre, vector
+    @localeName      varchar(20) = '',
+    @OnSaleOnly      tinyint = 0,
+	@storeID		 int = 1,
+	@filterProduct	 bit = 0,
+	@sortby			 varchar(10) = 'default',
+	@since			 int = 180  -- best sellers in the last "@since" number of days
+AS
+BEGIN
+	SET NOCOUNT ON
+
+    DECLARE @rcount int
+    DECLARE @productfiltersort table (rownum int not null identity  primary key, productid int not null, price money null, saleprice money null, displayorder int not null, VariantID int not null, VariantDisplayOrder int not null, ProductName nvarchar(400) null, VariantName nvarchar(400) null)
+    DECLARE @productfilter table (rownum int not null identity  primary key, productid int not null, price money null, saleprice money null,  displayorder int not null, VariantID int not null, VariantDisplayOrder int not null, ProductName nvarchar(400) null, VariantName nvarchar(400) null)
+	DECLARE @FilterProductsByAffiliate tinyint, @FilterProductsByCustomerLevel tinyint, @HideProductsWithLessThanThisInventoryLevel int
+    CREATE TABLE #displayorder ([name] nvarchar (800), productid int not null primary key, displayorder int not null)
+    CREATE TABLE #inventoryfilter (productid int not null, variantid int not null, InvQty int not null)
+    CREATE CLUSTERED INDEX tmp_inventoryfilter ON #inventoryfilter (productid, variantid)
+
+    DECLARE @customerLevelMappingsExist bit, @sectionMappingsExist bit, @localeMappingsExist bit, @affiliateMappingsExist bit, @categoryMappingsExist bit, @CustomerLevelFilteringIsAscending bit, @distributorMappingsExist bit, @genreMappingsExist bit, @vectorMappingsExist bit, @manufacturerMappingsExist bit, @ftsenabled tinyint = 0, @searching bit = 0
+
+	IF @searchstr IS NOT NULL
+		SET @searching = 1
+
+	IF @searching = 1
+	BEGIN
+		IF ((SELECT DATABASEPROPERTYEX(db_name(db_id()),'IsFulltextEnabled')) = 1
+			AND EXISTS (SELECT * FROM sysobjects WHERE id = OBJECT_ID(N'[dbo].[KeyWordSearch]') AND type in (N'FN', N'IF', N'TF', N'FS', N'FT'))
+			AND EXISTS (SELECT * FROM sysobjects WHERE id = OBJECT_ID(N'[dbo].[GetValidSearchString]') AND type in (N'FN', N'IF', N'TF', N'FS', N'FT')))
+		BEGIN
+			SET @ftsenabled = 1
+		END
+	END
+
+    SET @FilterProductsByAffiliate = (SELECT TOP 1 case ConfigValue when 'true' then 1 else 0 end FROM dbo.AppConfig with (nolock) WHERE [Name] = 'FilterProductsByAffiliate' AND (StoreID=@storeID OR StoreID=0) ORDER BY StoreID desc)
+    SET @FilterProductsByCustomerLevel = (SELECT TOP 1 case ConfigValue when 'true' then 1 else 0 end FROM dbo.AppConfig with (nolock) WHERE [Name] = 'FilterProductsByCustomerLevel' AND (StoreID=@storeID OR StoreID=0) ORDER BY StoreID desc)
+    SET @HideProductsWithLessThanThisInventoryLevel = (SELECT TOP 1 case ConfigValue when -1 then 0 else ConfigValue end FROM dbo.AppConfig with (nolock) WHERE [Name] = 'HideProductsWithLessThanThisInventoryLevel' AND (StoreID=@storeID OR StoreID=0) ORDER BY StoreID desc)
+
+    IF @InventoryFilter <> -1 and (@HideProductsWithLessThanThisInventoryLevel > @InventoryFilter or @HideProductsWithLessThanThisInventoryLevel  = -1)
+        SET @InventoryFilter  = @HideProductsWithLessThanThisInventoryLevel
+
+    SET @categoryID      = nullif(@categoryID, 0)
+    SET @sectionID       = nullif(@sectionID, 0)
+    SET @manufacturerID  = nullif(@manufacturerID, 0)
+    SET @distributorID   = nullif(@distributorID, 0)
+    SET @genreID         = nullif(@genreID, 0)
+    SET @vectorID        = nullif(@vectorID, 0)
+    SET @affiliateID     = nullif(@affiliateID, 0)
+    SET @ProductTypeID   = nullif(@ProductTypeID, 0)
+
+    SET @CustomerLevelFilteringIsAscending  = 0
+    SET @CustomerLevelFilteringIsAscending = (SELECT TOP 1 case ConfigValue when 'true' then 1 else 0 end FROM dbo.AppConfig with (nolock) WHERE [Name] = 'FilterByCustomerLevelIsAscending' AND (StoreID=@storeID OR StoreID=0) ORDER BY StoreID desc)
+
+    IF @localeID is null and ltrim(rtrim(@localeName)) <> ''
+        SELECT @localeID = LocaleSettingID FROM dbo.LocaleSetting with (nolock) WHERE Name = ltrim(rtrim(@localeName))
+
+	SELECT @categoryMappingsExist		= CASE WHEN EXISTS (SELECT * FROM ProductCategory) THEN 1 ELSE 0 END
+	SELECT @sectionMappingsExist		= CASE WHEN EXISTS (SELECT * FROM ProductSection) THEN 1 ELSE 0 END
+	SELECT @localeMappingsExist			= CASE WHEN EXISTS (SELECT * FROM ProductLocaleSetting) THEN 1 ELSE 0 END
+	SELECT @customerLevelMappingsExist	= CASE WHEN EXISTS (SELECT * FROM ProductCustomerLevel) THEN 1 ELSE 0 END
+	SELECT @affiliateMappingsExist		= CASE WHEN EXISTS (SELECT * FROM ProductAffiliate) THEN 1 ELSE 0 END
+	SELECT @distributorMappingsExist	= CASE WHEN EXISTS (SELECT * FROM ProductDistributor) THEN 1 ELSE 0 END
+	SELECT @genreMappingsExist			= CASE WHEN EXISTS (SELECT * FROM ProductGenre) THEN 1 ELSE 0 END
+	SELECT @vectorMappingsExist			= CASE WHEN EXISTS (SELECT * FROM ProductVector) THEN 1 ELSE 0 END
+	SELECT @manufacturerMappingsExist	= CASE WHEN EXISTS (SELECT * FROM ProductManufacturer) THEN 1 ELSE 0 END
+	
+    -- get page size
+    IF @pagesize is null or @pagesize = 0 BEGIN
+        IF @categoryID is not null
+            SELECT @pagesize = PageSize FROM dbo.Category with (nolock) WHERE categoryID = @categoryID
+        ELSE IF @sectionID is not null
+            SELECT @pagesize = PageSize FROM dbo.Section with (nolock) WHERE sectionID = @sectionID
+        ELSE IF @manufacturerID is not null
+            SELECT @pagesize = PageSize FROM dbo.Manufacturer with (nolock) WHERE manufacturerID = @manufacturerID
+        ELSE IF @distributorID is not null
+            SELECT @pagesize = PageSize FROM dbo.Distributor with (nolock) WHERE distributorID = @distributorID
+        ELSE IF @genreID is not null
+            SELECT @pagesize = PageSize FROM dbo.Genre with (nolock) WHERE genreID = @genreID
+        ELSE IF @vectorID is not null
+            SELECT @pagesize = PageSize FROM dbo.Vector with (nolock) WHERE vectorID = @vectorID
+        ELSE
+            SET @pagesize = (SELECT TOP 1 ConfigValue FROM dbo.AppConfig WITH (NOLOCK) WHERE Name = 'Default_CategoryPageSize' AND (StoreID = @storeID OR StoreID = 0) ORDER BY StoreID DESC)
+    END
+
+    IF @pagesize is null or @pagesize = 0
+        SET @pagesize = 20
+
+    -- get sort order
+    IF @filterProduct = 1 BEGIN
+		IF @sortEntity = 1 or @sortEntityName = 'category' BEGIN
+			INSERT #displayorder select distinct null as [name], a.productid, displayorder from dbo.ProductCategory a with (nolock) inner join (select distinct a.ProductID from ProductCategory a with (nolock)
+			inner join ProductStore ps with (nolock) on a.ProductID = ps.ProductID and StoreID = @storeID) b  on a.ProductID = b.ProductID where categoryID = @categoryID
+		END
+		ELSE IF @sortEntity = 2 or @sortEntityName = 'section' BEGIN
+			INSERT #displayorder select distinct null as [name], a.productid, displayorder from dbo.ProductSection a with (nolock) inner join (select distinct a.ProductID from ProductSection a with (nolock)
+			inner join ProductStore ps with (nolock) on a.ProductID = ps.ProductID and StoreID = @storeID) b on a.ProductID = B.ProductID where sectionId = @sectionID
+		END
+		ELSE IF @sortEntity = 3 or @sortEntityName = 'manufacturer' BEGIN
+			INSERT #displayorder select distinct null as [name], a.productid, displayorder from dbo.ProductManufacturer a with (nolock) inner join (select distinct a.ProductID from ProductManufacturer a with (nolock)
+			inner join ProductStore ps with (nolock) on a.ProductID = ps.ProductID and StoreID = @storeID) b on a.ProductID = B.ProductID where ManufacturerID = @manufacturerID
+		END
+		ELSE IF @sortEntity = 4 or @sortEntityName = 'distributor' BEGIN
+			INSERT #displayorder select distinct null as [name], a.productid, displayorder from dbo.ProductDistributor a with (nolock) inner join (select distinct a.ProductID from ProductDistributor a with (nolock)
+			inner join ProductStore ps with (nolock) on a.ProductID = ps.ProductID and StoreID = @storeID) b on a.ProductID = B.ProductID where DistributorID = @distributorID
+		END
+		ELSE IF @sortEntity = 5 or @sortEntityName = 'genre' BEGIN
+			INSERT #displayorder select distinct null as [name], a.productid, displayorder from dbo.ProductGenre a with (nolock) inner join (select distinct a.ProductID from ProductGenre a with (nolock)
+			inner join ProductStore ps with (nolock) on a.ProductID = ps.ProductID and StoreID = @storeID) b on a.ProductID = B.ProductID where GenreID = @genreID
+		END
+		ELSE IF @sortEntity = 6 or @sortEntityName = 'vector' BEGIN
+			INSERT #displayorder select distinct null as [name], a.productid, displayorder from dbo.ProductVector a with (nolock) inner join (select distinct a.ProductID from ProductVector a with (nolock)
+			inner join ProductStore ps with (nolock) on a.ProductID = ps.ProductID and StoreID = @storeID) b on a.ProductID = B.ProductID where VectorID = @vectorID
+		END
+		ELSE BEGIN
+			INSERT #displayorder select distinct [name], a.productid, 1 from dbo.Product a with (nolock) inner join (select distinct a.ProductID from Product a with (nolock)
+			inner join ProductStore ps with (nolock) on a.ProductID = ps.ProductID and StoreID = @storeID) b on a.ProductID = B.ProductID ORDER BY Name
+		END
+	END
+	ELSE BEGIN
+		IF @sortEntity = 1 or @sortEntityName = 'category' BEGIN
+			INSERT #displayorder select distinct null as [name], a.productid, displayorder from dbo.ProductCategory a with (nolock) where categoryID = @categoryID
+		END
+		ELSE IF @sortEntity = 2 or @sortEntityName = 'section' BEGIN
+			INSERT #displayorder select distinct null as [name], a.productid, displayorder from dbo.ProductSection a with (nolock) where sectionId = @sectionID
+		END
+		ELSE IF @sortEntity = 3 or @sortEntityName = 'manufacturer' BEGIN
+			INSERT #displayorder select distinct null as [name], a.productid, displayorder from dbo.ProductManufacturer a with (nolock) where ManufacturerID = @manufacturerID
+		END
+		ELSE IF @sortEntity = 4 or @sortEntityName = 'distributor' BEGIN
+			INSERT #displayorder select distinct null as [name], a.productid, displayorder from dbo.ProductDistributor a with (nolock) where DistributorID = @distributorID
+		END
+		ELSE IF @sortEntity = 5 or @sortEntityName = 'genre' BEGIN
+			INSERT #displayorder select distinct null as [name], a.productid, displayorder from dbo.ProductGenre a with (nolock) where GenreID = @genreID
+		END
+		ELSE IF @sortEntity = 6 or @sortEntityName = 'vector' BEGIN
+			INSERT #displayorder select distinct null as [name], a.productid, displayorder from dbo.ProductVector a with (nolock) where VectorID = @vectorID
+		END
+		ELSE BEGIN
+			INSERT #displayorder select distinct [name], a.productid, 1 from dbo.Product a with (nolock) ORDER BY Name
+		END
+	END
+
+	IF @searching = 1
+	BEGIN
+		IF (@ftsenabled = 1)
+		BEGIN
+			IF rtrim(isnull(@searchstr, '')) <> ''
+			BEGIN
+				DECLARE @tmpsrch nvarchar(4000)
+				SET @tmpsrch = dbo.GetValidSearchString(@searchstr)
+				DELETE #displayorder from #displayorder d left join dbo.KeyWordSearch(@tmpsrch) k on d.productid = k.productid where k.productid is null
+			END
+		END
+
+		SET @searchstr = '%' + rtrim(ltrim(@searchstr)) + '%'
+	END
+
+    IF @InventoryFilter <> -1 BEGIN
+        IF @ViewType = 1 BEGIN
+            INSERT #inventoryfilter
+            SELECT p.productid, pv.VariantID, sum(case p.TrackInventoryBySizeAndColor when 1 then isnull(i.quan, 0) else pv.inventory end ) invqty
+            FROM product p with (NOLOCK) join #displayorder d on p.ProductID = d.ProductID
+                join ProductVariant pv with (NOLOCK) on p.ProductID = pv.ProductID  and pv.IsDefault = 1
+                left join Inventory i with (NOLOCK) on pv.VariantID = i.VariantID
+            GROUP BY p.productid, pv.VariantID
+            HAVING sum(case p.TrackInventoryBySizeAndColor when 1 then isnull(i.quan, 0) else pv.inventory end ) >= @InventoryFilter
+        END
+        ELSE
+            INSERT #inventoryfilter
+            SELECT p.productid, pv.VariantID, sum(case p.TrackInventoryBySizeAndColor when 1 then isnull(i.quan, 0) else pv.inventory end ) invqty
+            FROM product p with (NOLOCK) join #displayorder d on p.ProductID = d.ProductID
+                join ProductVariant pv with (NOLOCK) on p.ProductID = pv.ProductID
+                left join Inventory i with (NOLOCK) on pv.VariantID = i.VariantID
+            GROUP BY p.productid, pv.VariantID
+            HAVING sum(case p.TrackInventoryBySizeAndColor when 1 then isnull(i.quan, 0) else pv.inventory end ) >= @InventoryFilter
+
+
+        INSERT @productfilter (productid, displayorder, VariantID, VariantDisplayOrder, ProductName, VariantName)
+        SELECT distinct p.productid, do.displayorder, pv.VariantID, pv.DisplayOrder, p.Name, pv.Name
+        FROM
+            product p with (nolock)
+            join #displayorder do on p.ProductID = do.ProductID
+            left join ProductVariant pv        with (NOLOCK) ON p.ProductID = pv.ProductID and pv.IsDefault >= @ViewType
+            left join productcategory pc       with (nolock) on p.ProductID = pc.ProductID
+            left join productsection ps        with (nolock) on p.ProductID = ps.ProductID
+            left join ProductManufacturer pm   with (nolock) on p.ProductID = pm.ProductID
+            left join ProductDistributor pd    with (nolock) on p.ProductID = pd.ProductID
+            left join ProductGenre px          with (nolock) on p.ProductID = px.ProductID
+            left join ProductVector px2        with (nolock) on p.ProductID = px2.ProductID
+            left join ProductLocaleSetting pl  with (nolock) on p.ProductID = pl.ProductID
+            left join ProductCustomerLevel pcl with (nolock) on p.ProductID = pcl.ProductID
+            left join ProductAffiliate pa      with (nolock) on p.ProductID = pa.ProductID
+
+            join #inventoryfilter i on pv.VariantID = i.VariantID
+        WHERE
+              (pc.categoryid = @categoryID or @categoryID is null or @categoryMappingsExist = 0)
+          and (ps.sectionid = @sectionID or @sectionID is null or @sectionMappingsExist = 0)
+          and (pl.LocaleSettingID = @localeID or @localeID is null or @localeMappingsExist = 0)
+          and (pa.AffiliateID = @affiliateID or pa.AffiliateID is null or @affiliateMappingsExist = 0 or @FilterProductsByAffiliate = 0)
+          and (pm.manufacturerid = @manufacturerID or @manufacturerID is null or @manufacturerMappingsExist = 0)
+          and (pd.DistributorID = @distributorID or @distributorID is null or @distributorMappingsExist = 0)
+          and (px.GenreID = @genreID or @genreID is null or @genreMappingsExist = 0)
+          and (px2.VectorID = @vectorID or @vectorID is null or @vectorMappingsExist = 0)
+          and p.ProductTypeID = coalesce(@ProductTypeID, p.ProductTypeID)
+          and (case
+                when @FilterProductsByCustomerLevel = 0 or @customerLevelMappingsExist = 0 or pcl.CustomerLevelID is null or @CustomerLevelID is null then 1
+                when @CustomerLevelFilteringIsAscending = 1 and pcl.CustomerLevelID <= @CustomerLevelID then 1
+                when pcl.CustomerLevelID = @CustomerLevelID or pcl.CustomerLevelID is null then 1
+                else 0
+               end  = 1
+              )
+          and (@ftsenabled = 1 or
+					(@searching = 0 or
+						(@searching = 1 and
+							(@ftsenabled = 0 and
+								(patindex(@searchstr, isnull(p.name, '')) > 0
+									or patindex(@searchstr, isnull(convert(nvarchar(20),p.productid), '')) > 0
+									or patindex(@searchstr, isnull(pv.name, '')) > 0
+									or patindex(@searchstr, isnull(p.sku , '')+isnull(pv.skusuffix , '')) > 0
+									or patindex(@searchstr, isnull(p.manufacturerpartnumber, '')) > 0
+									or patindex(@searchstr, isnull(pv.manufacturerpartnumber, '')) > 0
+									or (patindex(@searchstr, isnull(p.Description, '')) > 0 and @extSearch = 1)
+									or (patindex(@searchstr, isnull(p.Summary, '')) > 0 and @extSearch = 1)
+								)
+							)
+						)
+					)
+				)
+          and case when isnull(pv.saleprice,0) = 0 then 0 else 1 end >= @OnSaleOnly
+          and p.published >= @publishedonly
+          and pv.published >= @publishedonly
+          and isnull(p.IsAKit, 0) <= 1-@ExcludeKits
+          and p.IsSystem <= 1-@ExcludeSysProds
+          and p.Deleted = 0
+          and pv.Deleted = 0
+        order by do.displayorder, p.Name, pv.DisplayOrder, pv.Name
+
+    END
+    ELSE BEGIN
+        INSERT @productfilter (productid, displayorder, VariantID, VariantDisplayOrder, ProductName, VariantName)
+        SELECT distinct p.productid, do.displayorder, pv.VariantID, pv.DisplayOrder, p.Name, pv.Name
+        FROM
+            product p with (nolock)
+            join #displayorder do on p.ProductID = do.ProductID
+            join ProductVariant pv             with (NOLOCK) on p.ProductID = pv.ProductID and pv.IsDefault >= @ViewType
+            left join productcategory pc       with (nolock) on p.ProductID = pc.ProductID
+            left join productsection ps        with (nolock) on p.ProductID = ps.ProductID
+            left join ProductManufacturer pm   with (nolock) on p.ProductID = pm.ProductID
+            left join ProductDistributor pd    with (nolock) on p.ProductID = pd.ProductID
+            left join ProductGenre px          with (nolock) on p.ProductID = px.ProductID
+            left join ProductVector px2        with (nolock) on p.ProductID = px2.ProductID
+            left join ProductLocaleSetting pl  with (nolock) on p.ProductID = pl.ProductID
+            left join ProductCustomerLevel pcl with (nolock) on p.ProductID = pcl.ProductID
+            left join ProductAffiliate pa      with (nolock) on p.ProductID = pa.ProductID
+        WHERE
+              (pc.categoryid = @categoryID or @categoryID is null or @categoryMappingsExist = 0)
+          and (ps.sectionid = @sectionID or @sectionID is null or @sectionMappingsExist = 0)
+          and (pl.LocaleSettingID = @localeID or @localeID is null or @localeMappingsExist = 0)
+          and (pa.AffiliateID = @affiliateID or pa.AffiliateID is null or @affiliateMappingsExist = 0 or @FilterProductsByAffiliate = 0)
+          and (pm.manufacturerid = @manufacturerID or @manufacturerID is null or @manufacturerMappingsExist = 0)
+          and (pd.DistributorID = @distributorID or @distributorID is null or @distributorMappingsExist = 0)
+          and (px.GenreID = @genreID or @genreID is null or @genreMappingsExist = 0)
+          and (px2.VectorID = @vectorID or @vectorID is null or @vectorMappingsExist = 0)
+          and p.ProductTypeID = coalesce(@ProductTypeID, p.ProductTypeID)
+          and (case
+                when @FilterProductsByCustomerLevel = 0 or @customerLevelMappingsExist = 0 or pcl.CustomerLevelID is null or @CustomerLevelID is null then 1
+                when @CustomerLevelFilteringIsAscending = 1 and pcl.CustomerLevelID <= @CustomerLevelID then 1
+                when pcl.CustomerLevelID = @CustomerLevelID or pcl.CustomerLevelID is null then 1
+                else 0
+               end  = 1
+              )
+          and (@ftsenabled = 1 or
+					(@searching = 0 or
+						(@searching = 1 and
+							(@ftsenabled = 0 and
+								(patindex(@searchstr, isnull(p.name, '')) > 0
+									or patindex(@searchstr, isnull(convert(nvarchar(20),p.productid), '')) > 0
+									or patindex(@searchstr, isnull(pv.name, '')) > 0
+									or patindex(@searchstr, isnull(p.sku , '')+isnull(pv.skusuffix , '')) > 0
+									or patindex(@searchstr, isnull(p.manufacturerpartnumber, '')) > 0
+									or patindex(@searchstr, isnull(pv.manufacturerpartnumber, '')) > 0
+									or (patindex(@searchstr, isnull(p.Description, '')) > 0 and @extSearch = 1)
+									or (patindex(@searchstr, isnull(p.Summary, '')) > 0 and @extSearch = 1)
+								)
+							)
+						)
+					)
+				)
+          and case when isnull(pv.saleprice,0) = 0 then 0 else 1 end >= @OnSaleOnly
+          and p.published >= @publishedonly
+          and pv.published >= @publishedonly
+          and isnull(p.IsAKit, 0) <= 1-@ExcludeKits
+          and p.IsSystem <= 1-@ExcludeSysProds
+          and p.Deleted = 0
+          and pv.Deleted = 0
+        order by do.displayorder, p.Name, pv.DisplayOrder, pv.Name
+    END
+
+    SET @rcount = @@rowcount
+    IF @StatsFirst = 1
+        SELECT cast(ceiling(@rcount*1.0/@pagesize) as int) pages, @rcount ProductCount
+
+
+  --Begin sorting
+  	if @sortby = 'bestseller'
+		begin
+			insert @productfiltersort (productid, price, saleprice, displayorder, VariantID, VariantDisplayOrder, ProductName, VariantName)
+			select pf.productid, pf.price, pf.saleprice, pf.displayorder, pf.VariantID, pf.VariantDisplayOrder, pf.ProductName, pf.VariantName
+				from @productfilter pf
+				inner join (
+					select ProductID, SUM(Quantity) AS NumSales
+					  from dbo.Orders_ShoppingCart sc with (NOLOCK)
+							join [dbo].Orders o with (NOLOCK)  on sc.OrderNumber = o.OrderNumber and o.OrderDate >= dateadd(dy, -@since, getdate())
+					  group by ProductID
+				) bsSort on pf.productid = bsSort.ProductID
+				order by isnull(bsSort.NumSales, 0) DESC
+		end
+  	else --default
+		begin
+			insert @productfiltersort (productid, price, saleprice, displayorder, VariantID, VariantDisplayOrder, ProductName, VariantName)
+			select productid, price, saleprice, displayorder, VariantID, VariantDisplayOrder, ProductName, VariantName
+			from @productfilter order by displayorder, productName, variantDisplayOrder, variantName
+		end
+
+    -- Check filtered products for recurring variants
+    Declare @ProductResults Table
+    (
+		ProductID int
+		, VariantID int
+		, HasRecurring bit
+		, RowNum int
+    );
+    -- temp table based on filtered product result set
+    Insert Into @ProductResults
+
+    SELECT   Distinct
+        p.ProductID,
+		pv.VariantID,
+		0,
+		pf.rownum
+    FROM dbo.Product p with (NOLOCK)
+        left join dbo.ProductVariant       pv  with (NOLOCK) on p.ProductID = pv.ProductID and pv.IsDefault >= @ViewType
+        join @productfiltersort            pf                on pv.ProductID = pf.ProductID and pv.VariantID = pf.VariantID
+    WHERE pf.rownum >= @pagesize*(@pagenum-1)+1 and pf.rownum <= @pagesize*(@pagenum)
+    ORDER BY pf.rownum
+
+    -- set HasRecurring
+    Update pr
+    Set HasRecurring = 1
+    From @ProductResults pr, (
+		Select prs.ProductId
+		From @ProductResults prs, ProductVariant pv
+		Where prs.ProductID = pv.ProductID
+		And pv.IsRecurring = 1
+		And pv.Deleted = 0
+		And pv.Published = 1
+		Group By prs.ProductId
+		Having Count(*) > 0) tmp
+    Where pr.ProductId = tmp.ProductId
+    ---- End Recurring
+
+    SELECT
+        p.ProductID,
+        p.Name,
+        pv.VariantID,
+        pv.Name AS VariantName,
+        p.ProductGUID,
+        p.Summary,
+        p.Description,
+        p.SEKeywords,
+        p.SEDescription,
+        p.MiscText,
+        p.FroogleDescription,
+        p.SETitle,
+        p.SEAltText,
+        p.SizeOptionPrompt,
+        p.ColorOptionPrompt,
+        p.TextOptionPrompt,
+        p.ProductTypeID,
+        p.TaxClassID,
+        p.SKU,
+        p.ManufacturerPartNumber,
+        p.SalesPromptID,
+        p.IsFeatured,
+        p.XmlPackage,
+        p.ColWidth,
+        p.Published,
+        p.RequiresRegistration,
+        p.Looks,
+        p.Notes,
+        p.QuantityDiscountID,
+        p.RelatedProducts,
+        p.UpsellProducts,
+        p.UpsellProductDiscountPercentage,
+        p.RelatedDocuments,
+        p.TrackInventoryBySizeAndColor,
+        p.TrackInventoryBySize,
+        p.TrackInventoryByColor,
+        p.IsAKit,
+        p.ShowBuyButton,
+        p.RequiresProducts,
+        p.HidePriceUntilCart,
+        p.IsCalltoOrder,
+        p.ExcludeFromPriceFeeds,
+        p.RequiresTextOption,
+        p.TextOptionMaxLength,
+        p.SEName,
+        p.Deleted,
+        p.CreatedOn,
+        p.ImageFileNameOverride,
+        pv.VariantGUID,
+        pv.Description AS VariantDescription,
+        pv.SEKeywords AS VariantSEKeywords,
+        pv.SEDescription AS VariantSEDescription,
+        pv.Colors,
+        pv.ColorSKUModifiers,
+        pv.Sizes,
+        pv.SizeSKUModifiers,
+        pv.FroogleDescription AS VariantFroogleDescription,
+        pv.SKUSuffix,
+        pv.ManufacturerPartNumber AS VariantManufacturerPartNumber,
+        pv.Price,
+        pv.CustomerEntersPrice,
+        pv.CustomerEntersPricePrompt,
+        isnull(pv.SalePrice, 0) SalePrice,
+        cast(isnull(pv.Weight,0) as decimal(10,1)) Weight,
+        pv.MSRP,
+        pv.Cost,
+        isnull(pv.Points,0) Points,
+        pv.Dimensions,
+        case p.TrackInventoryBySizeAndColor when 1 then isnull(i.quan, 0) else pv.inventory end Inventory,
+        pv.DisplayOrder as VariantDisplayOrder,
+        pv.Notes AS VariantNotes,
+        pv.IsTaxable,
+        pv.IsShipSeparately,
+        pv.IsDownload,
+        pv.DownloadLocation,
+        pv.Published AS VariantPublished,
+        pv.IsSecureAttachment,
+        pv.IsRecurring,
+        pv.RecurringInterval,
+        pv.RecurringIntervalType,
+        pv.SEName AS VariantSEName,
+        pv.RestrictedQuantities,
+        pv.MinimumQuantity,
+        pv.Deleted AS VariantDeleted,
+        pv.CreatedOn AS VariantCreatedOn,
+        d.Name AS DistributorName,
+        d.DistributorID,
+        d.SEName AS DistributorSEName,
+        m.ManufacturerID,
+        m.Name AS ManufacturerName,
+        m.SEName AS ManufacturerSEName,
+        s.Name AS SalesPromptName,
+        pf.HasRecurring,
+        case when pcl.productid is null then 0 else isnull(ep.Price, 0) end ExtendedPrice
+    FROM dbo.Product p with (NOLOCK)
+        left join dbo.ProductVariant       pv  with (NOLOCK) on p.ProductID = pv.ProductID and pv.IsDefault >= @ViewType
+        join @ProductResults			   pf                on pv.ProductID = pf.ProductID and pv.VariantID = pf.VariantID
+        left join dbo.SalesPrompt           s  with (NOLOCK) on p.SalesPromptID = s.SalesPromptID
+        left join dbo.ProductManufacturer  pm  with (NOLOCK) on p.ProductID = pm.ProductID
+        left join dbo.Manufacturer          m  with (NOLOCK) on pm.ManufacturerID = m.ManufacturerID
+        left join dbo.ProductDistributor   pd  with (NOLOCK) on p.ProductID = pd.ProductID
+        left join dbo.Distributor           d  with (NOLOCK) on pd.DistributorID = d.DistributorID
+        left join dbo.ExtendedPrice        ep  with (NOLOCK) on ep.VariantID = pv.VariantID and ep.CustomerLevelID = @CustomerLevelID
+        left join dbo.ProductCustomerLevel pcl with (NOLOCK) on p.ProductID = pcl.ProductID and pcl.CustomerLevelID = @CustomerLevelID
+        left join (select VariantID, sum(quan) quan from dbo.Inventory with (nolock) group by VariantID) i  on pv.VariantID = i.VariantID
+
+    IF @StatsFirst <> 1
+        SELECT cast(ceiling(@rcount*1.0/@pagesize) as int) pages, @rcount ProductCount
+END
+GO
+
+--Promo query tuning
+IF EXISTS (select * from dbo.sysobjects where id = object_id(N'[dbo].aspdnsf_GetAvailablePromos') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
+    drop proc [dbo].[aspdnsf_GetAvailablePromos]
+GO
+
+CREATE proc [dbo].[aspdnsf_GetAvailablePromos]
+    @productIdList	nvarchar(max),
+	@StoreID		int = 0,
+	@CustomerID		int = 0,
+	@CustomerLevel	int = 0
+
+AS
+BEGIN
+	declare @productIds table (ProductId int not null)
+	insert into @productIds select distinct * from dbo.Split(@productIdList, ',')
+
+	declare @FilterPromotions tinyint
+	SET @FilterPromotions = (SELECT case ConfigValue WHEN 'true' THEN 1 ELSE 0 END FROM GlobalConfig WHERE Name='AllowCouponFiltering')
+
+	DECLARE @CustomerEmail varchar(max)
+	SELECT @CustomerEmail = Email FROM Customer WHERE CustomerID = @CustomerID
+				
+	select
+		DISTINCT ids.ProductId,
+		p.CallToAction
+	from
+		Promotions p
+			left join (SELECT PromotionRuleData.value('(/ArrayOfPromotionRuleBase/PromotionRuleBase/ExpirationDate/node())[1]', 'nvarchar(40)') AS ExpDate, Id 
+				FROM Promotions) d on d.Id = p.Id
+			left join PromotionStore pt
+				on p.Id = pt.PromotionID and p.Active = 1 and p.AutoAssigned = 1,
+		@productIds ids
+			left join ProductCategory pc
+				on pc.ProductId = ids.ProductId
+			left join ProductSection ps
+				on ps.ProductId = ids.ProductId
+			left join ProductManufacturer pm
+				on pm.ProductId = ids.ProductId
+	where
+		(d.ExpDate IS NULL OR CONVERT(date, d.ExpDate) > getDate())
+		and isnull(p.CallToAction, '') != ''
+		and (@FilterPromotions = 0 OR pt.StoreID = @StoreID)
+		and (
+				-- ProductIdPromotionRule
+				p.PromotionRuleData.exist('/ArrayOfPromotionRuleBase/PromotionRuleBase/ProductIds[int = sql:column("ids.ProductId")]') = 1
+
+				-- CategoryPromotionRule
+				or p.PromotionRuleData.exist('/ArrayOfPromotionRuleBase/PromotionRuleBase/CategoryIds[int = sql:column("pc.CategoryId")]') = 1
+
+				-- SectionPromotionRule
+				or p.PromotionRuleData.exist('/ArrayOfPromotionRuleBase/PromotionRuleBase/SectionIds[int = sql:column("ps.SectionId")]') = 1
+
+				-- ManufacturerPromotionRule
+				or p.PromotionRuleData.exist('/ArrayOfPromotionRuleBase/PromotionRuleBase/ManufacturerIds[int = sql:column("pm.ManufacturerId")]') = 1
+
+				-- GiftProductPromotionDiscount
+				or p.PromotionDiscountData.exist('/ArrayOfPromotionDiscountBase/PromotionDiscountBase/GiftProductIds[int = sql:column("ids.ProductId")]') = 1
+			)
+		-- Email Address rule
+		and (
+				p.PromotionRuleData.exist('/ArrayOfPromotionRuleBase/PromotionRuleBase/EmailAddresses') = 0
+				or p.PromotionRuleData.exist('/ArrayOfPromotionRuleBase/PromotionRuleBase/EmailAddresses[string = sql:variable("@CustomerEmail")]') = 1
+			)
+		-- Customer Level rule
+		and (
+				p.PromotionRuleData.exist('/ArrayOfPromotionRuleBase/PromotionRuleBase/CustomerLevels') = 0
+				or p.PromotionRuleData.exist('/ArrayOfPromotionRuleBase/PromotionRuleBase/CustomerLevels[int = sql:variable("@CustomerLevel")]') = 1
+			)
+	for xml path('Promotion')
+END
+GO
+
+--aspdnsf_EntityMgr tuning
+IF EXISTS (select * from dbo.sysobjects where id = object_id(N'[dbo].aspdnsf_EntityMgr') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
+    drop proc [dbo].[aspdnsf_EntityMgr]
+GO
+
+create proc [dbo].[aspdnsf_EntityMgr]
+    @EntityName varchar(100),
+    @PublishedOnly tinyint
+
+AS
+BEGIN
+    SET NOCOUNT ON
+    IF @EntityName = 'Category' BEGIN
+        SELECT Entity.CategoryID EntityID,
+			XmlPackage,
+			Name,
+			ColWidth,
+			ParentCategoryID ParentEntityID,
+			[Description],
+			DisplayOrder,
+			Published,
+			SEName,
+			PageSize,
+			SETitle,
+			SEAltText,
+			SEDescription,
+			SEKeywords,
+			TemplateName
+        FROM dbo.Category Entity with (NOLOCK)
+        WHERE Published >= @PublishedOnly and Deleted=0
+    END
+
+    IF @EntityName = 'Affiliate' BEGIN
+        SELECT Entity.AffiliateID EntityID, 
+			'' as XmlPackage,
+			Name,
+			4 as ColWidth,
+			ParentAffiliateID ParentEntityID,
+			'' as [Description],
+			DisplayOrder,
+			Published,
+			SEName,
+			0 as PageSize,
+			SETitle,
+			SEAltText,
+			SEDescription,
+			SEKeywords,
+			TemplateName
+        FROM dbo.Affiliate Entity with (NOLOCK)
+        WHERE Published >= @PublishedOnly and Deleted=0
+    END
+
+    IF @EntityName = 'Section' BEGIN
+        SELECT Entity.SectionID EntityID,
+			XmlPackage,
+			Name,
+			ColWidth,
+			ParentSectionID ParentEntityID,
+			[Description],
+			DisplayOrder,
+			Published,
+			SEName,
+			PageSize,
+			SETitle,
+			SEAltText,
+			SEDescription,
+			SEKeywords,
+			TemplateName
+        FROM dbo.Section Entity with (NOLOCK)
+        WHERE Published >= @PublishedOnly and Deleted=0
+    END
+
+    IF @EntityName = 'Manufacturer' BEGIN
+        SELECT Entity.ManufacturerID EntityID,
+			XmlPackage,
+			Name,
+			ColWidth,
+			ParentManufacturerID as ParentEntityID,
+			[Description],
+			DisplayOrder,
+			Published,
+			SEName,
+			PageSize,
+			SETitle,
+			SEAltText,
+			SEDescription,
+			SEKeywords,
+			TemplateName
+        FROM dbo.Manufacturer Entity with (NOLOCK)
+        WHERE Published >= @PublishedOnly and Deleted=0
+    END
+
+    IF @EntityName = 'Library' BEGIN
+        SELECT Entity.LibraryID EntityID,
+			XmlPackage,
+			Name,
+			ColWidth,
+			ParentLibraryID as ParentEntityID,
+			[Description],
+			DisplayOrder,
+			Published,
+			SEName,
+			PageSize,
+			SETitle,
+			SEAltText,
+			SEDescription,
+			SEKeywords,
+			TemplateName
+		FROM dbo.Library Entity with (NOLOCK)
+        WHERE Published >= @PublishedOnly and Deleted=0
+    END
+
+    IF @EntityName = 'Distributor' BEGIN
+        SELECT Entity.DistributorID EntityID,
+			XmlPackage,
+			Name,
+			ColWidth,
+			ParentDistributorID as ParentEntityID,
+			[Description],
+			DisplayOrder,
+			Published,
+			SEName,
+			PageSize,
+			SETitle,
+			SEAltText,
+			SEDescription,
+			SEKeywords,
+			TemplateName
+		FROM dbo.Distributor Entity with (NOLOCK)
+        WHERE Published >= @PublishedOnly and Deleted=0
+    END
+
+    IF @EntityName = 'Genre' BEGIN
+        SELECT Entity.GenreID EntityID,
+			XmlPackage,
+			Name,
+			ColWidth,
+			ParentGenreID as ParentEntityID,
+			[Description],
+			DisplayOrder,
+			Published,
+			SEName,
+			PageSize,
+			SETitle,
+			SEAltText,
+			SEDescription,
+			SEKeywords,
+			TemplateName
+		FROM dbo.Genre Entity with (NOLOCK)
+        WHERE Published >= @PublishedOnly and Deleted=0
+    END
+
+    IF @EntityName = 'Vector' BEGIN
+        SELECT Entity.VectorID EntityID,
+			XmlPackage,
+			Name,
+			ColWidth,
+			ParentVectorID as ParentEntityID,
+			[Description],
+			DisplayOrder,
+			Published,
+			SEName,
+			PageSize,
+			SETitle,
+			SEAltText,
+			SEDescription,
+			SEKeywords,
+			TemplateName
+		FROM dbo.Vector Entity with (NOLOCK)
+        WHERE Published >= @PublishedOnly and Deleted=0
+    END
+
+    IF @EntityName = 'Customerlevel' BEGIN
+        SELECT Entity.CustomerLevelID EntityID,
+			'' as XmlPackage,
+			Name, 
+			4 as ColWidth,
+			ParentCustomerLevelID ParentEntityID,
+			'' as [Description],
+			DisplayOrder,
+			1 as Published,
+			SEName,
+			20 as PageSize,
+			'' as SETitle,
+			'' as SEAltText,
+			'' as SEDescription,
+			'' as SEKeywords,
+			TemplateName
+        FROM dbo.CustomerLevel Entity with (NOLOCK)
+        WHERE Deleted=0
+    END
+END
+GO
+
+--aspdnsf_SessionUpdate tuning
+IF EXISTS (select * from dbo.sysobjects where id = object_id(N'[dbo].aspdnsf_SessionUpdate') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
+    drop proc [dbo].[aspdnsf_SessionUpdate]
+GO
+
+CREATE proc [dbo].[aspdnsf_SessionUpdate]
+    @CustomerSessionID int,
+    @SessionName nvarchar(100),
+    @SessionValue nvarchar(max),
+    @ExpiresOn datetime,
+    @LoggedOut datetime
+
+AS
+SET NOCOUNT ON
+
+UPDATE dbo.Customersession
+SET
+    SessionName = COALESCE(@SessionName, SessionName),
+    SessionValue = COALESCE(@SessionValue, SessionValue),
+    ExpiresOn = COALESCE(@ExpiresOn, ExpiresOn),
+    LastActivity = getdate(),
+    LoggedOut = COALESCE(@LoggedOut, LoggedOut)
+WHERE CustomerSessionID = @CustomerSessionID
+GO
+
+--Make SearchLog opt-in
+if not exists(select * from [dbo].[AppConfig] where [Name] = 'Search_LogSearches')
+BEGIN
+INSERT INTO [dbo].[AppConfig] ([Name], [Description], [ValueType], [AllowableValues], [ConfigValue], [GroupName], [SuperOnly], [Hidden])
+	VALUES ('Search_LogSearches', 'If true, customer searches will be logged in the SearchLog table.', 'boolean', NULL, 'false', 'SEARCH', 0, 0)
+END
+
+--Related products fixing
+IF EXISTS (select * from dbo.sysobjects where id = object_id(N'[dbo].aspdnsf_GetCustomersRelatedProducts') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
+    drop proc [dbo].[aspdnsf_GetCustomersRelatedProducts]
+GO
+
+CREATE PROCEDURE [dbo].[aspdnsf_GetCustomersRelatedProducts]
+	@CustomerViewID		NVARCHAR(50),
+	@ProductID			INT,
+	@CustomerLevelID	INT,
+	@InvFilter			INT,
+	@affiliateID		INT,
+	@storeID			INT = 1,
+	@filterProduct		BIT = 0
+
+AS
+SET NOCOUNT ON
+
+DECLARE
+	   @custlevelcount INT,
+	   @CustomerLevelFilteringIsAscending BIT = 0,
+	   @FilterProductsByCustomerLevel BIT,
+	   @relatedprods VARCHAR(8000),
+	   @DynamicProductsEnabled VARCHAR(10),
+	   @ProductsDisplayed INT,
+	   @FilterProductsByAffiliate BIT,
+	   @affiliatecount INT,
+	   @AffiliateExists INT
+
+--Configs
+SET @FilterProductsByCustomerLevel = (SELECT TOP 1 case ConfigValue when 'true' then 1 else 0 end FROM dbo.AppConfig with (nolock) WHERE [Name] = 'FilterProductsByCustomerLevel' AND (StoreID=@storeID OR StoreID=0) ORDER BY StoreID desc)
+SET @CustomerLevelFilteringIsAscending = (SELECT TOP 1 case ConfigValue when 'true' then 1 else 0 end FROM dbo.AppConfig with (nolock) WHERE [Name] = 'FilterByCustomerLevelIsAscending' AND (StoreID=@storeID OR StoreID=0) ORDER BY StoreID desc)
+SET @FilterProductsByAffiliate = (SELECT TOP 1 case ConfigValue when 'true' then 1 else 0 end FROM dbo.AppConfig with (nolock) WHERE [Name] = 'FilterProductsByAffiliate' AND (StoreID=@storeID OR StoreID=0) ORDER BY StoreID desc)
+SET @DynamicProductsEnabled = (SELECT TOP 1 case ConfigValue when 'true' then 1 else 0 end FROM dbo.AppConfig with (nolock) WHERE [Name] = 'DynamicRelatedProducts.Enabled' AND (StoreID=@storeID OR StoreID=0) ORDER BY StoreID desc)
+SET @ProductsDisplayed = (SELECT TOP 1 CAST(ConfigValue AS INT) FROM dbo.AppConfig with (nolock) WHERE [Name] = 'RelatedProducts.NumberDisplayed' AND (StoreID=@storeID OR StoreID=0) ORDER BY StoreID desc)
+
+--Counts
+SELECT @custlevelcount = COUNT(*) FROM ProductCustomerLevel
+SELECT @affiliatecount = COUNT(*) FROM dbo.ProductAffiliate WITH (NOLOCK) WHERE ProductID = @ProductID
+SELECT @AffiliateExists = CASE WHEN AffiliateID = @affiliateID THEN 1 ELSE 0 END FROM dbo.ProductAffiliate WITH (NOLOCK) WHERE ProductID = @ProductID
+
+--Temp table for fixed related products
+select @relatedprods = replace(cast(relatedproducts as varchar(8000)), ' ', '') from dbo.product with (NOLOCK) where productid = @productid
+DECLARE @RelatedProductsTable table (ProductId int not null)
+insert into @RelatedProductsTable select distinct * from dbo.Split(@relatedprods, ',')
+
+IF(@DynamicProductsEnabled = 1 and @ProductsDisplayed > 0)
+BEGIN
+	SELECT TOP (@ProductsDisplayed)
+	           tp.ProductID
+			 , tp.ProductGUID
+			 , tp.ImageFilenameOverride
+			 , tp.SKU
+			 , ISNULL(PRODUCTVARIANT.SkuSuffix, '') AS SkuSuffix
+			 , ISNULL(PRODUCTVARIANT.ManufacturerPartNumber, '') AS VariantManufacturerPartNumber
+			 , ISNULL(tp.ManufacturerPartNumber, '') AS ManufacturerPartNumber
+		     , ISNULL(PRODUCTVARIANT.Dimensions, '') AS Dimensions
+			 , PRODUCTVARIANT.Weight
+			 , ISNULL(PRODUCTVARIANT.GTIN, '') AS GTIN
+			 , PRODUCTVARIANT.VariantID
+			 , PRODUCTVARIANT.Condition
+			 , tp.SEAltText
+			 , tp.Name
+			 , tp.Description
+			 , ProductManufacturer.ManufacturerID AS ProductManufacturerId
+			 , Manufacturer.Name AS ProductManufacturerName
+			 , Manufacturer.SEName AS ProductManufacturerSEName
+		FROM Product tp WITH (NOLOCK)
+		JOIN (SELECT p.ProductID
+				   , p.ProductGUID
+				   , p.ImageFilenameOverride
+				   , p.SKU
+				   , p.SEAltText
+				   , p.Name
+				   , p.Description
+				FROM dbo.product p WITH (NOLOCK)
+				JOIN @RelatedProductsTable rp ON p.productid = rp.ProductId
+		   LEFT JOIN dbo.productcustomerlevel pcl WITH (NOLOCK) ON p.productid = pcl.productid and @FilterProductsByCustomerLevel = 1
+				JOIN (SELECT p.ProductID
+						FROM dbo.product p WITH (NOLOCK)
+						JOIN @RelatedProductsTable rp on p.productid = rp.ProductId
+						JOIN (SELECT ProductID
+								   , SUM(Inventory) Inventory
+								FROM dbo.productvariant WITH (NOLOCK) GROUP BY ProductID) pv ON p.ProductID = pv.ProductID
+						   LEFT JOIN (SELECT pv1.ProductID
+										   , SUM(quan) inventory
+										FROM dbo.inventory i1 WITH (NOLOCK)
+										JOIN dbo.productvariant pv1 WITH (NOLOCK) ON pv1.variantid = i1.variantid
+										JOIN @RelatedProductsTable rp1 ON pv1.productid = rp1.ProductID GROUP BY pv1.productid) i ON i.productid = p.productid
+								  WHERE CASE p.TrackInventoryBySizeAndColor WHEN 1 THEN ISNULL(i.inventory, 0) ELSE pv.inventory END >= @InvFilter
+					 ) tp on p.productid = tp.productid
+			   WHERE published = 1
+				 AND deleted = 0
+				 AND p.productid != @productid
+				 AND CASE
+					 WHEN @FilterProductsByCustomerLevel = 0 THEN 1
+					 WHEN @CustomerLevelFilteringIsAscending = 1 AND pcl.CustomerLevelID <= @CustomerLevelID OR pcl.CustomerLevelID IS NULL THEN 1
+					 WHEN @CustomerLevelID=0 AND pcl.CustomerLevelID IS NULL THEN 1
+					 WHEN @CustomerLevelID IS NULL OR @custlevelcount = 0 THEN 1
+					 WHEN pcl.CustomerLevelID = @CustomerLevelID OR pcl.CustomerLevelID IS NULL THEN 1
+					 ELSE 0
+					 END = 1
+	UNION ALL
+	   SELECT pr.ProductID
+			, pr.ProductGUID
+			, pr.ImageFilenameOverride
+			, pr.SKU
+			, pr.SEAltText
+			, pr.Name
+			, pr.Description
+		 FROM Product pr WITH (NOLOCK)
+		WHERE pr.ProductID IN (
+		SELECT TOP 100 PERCENT p.ProductID
+		  FROM Product p WITH (NOLOCK)
+		  JOIN (SELECT ProductID
+				  FROM ProductView WITH (NOLOCK) WHERE CustomerViewID
+					IN (SELECT CustomerViewID
+						  FROM ProductView WITH (NOLOCK)
+						 WHERE ProductID = @ProductID
+						   AND CustomerViewID <> @CustomerViewID
+					   )
+				   AND ProductID <> @ProductID
+				   AND ProductID NOT
+					IN (SELECT p.ProductID
+						  FROM product p WITH (NOLOCK)
+						  JOIN @RelatedProductsTable rp ON p.productid = rp.ProductId
+					  GROUP BY p.ProductID
+					   )
+				) a ON p.ProductID = a.ProductID
+	LEFT JOIN dbo.productcustomerlevel pcl WITH (NOLOCK) ON p.productid = pcl.productid and @FilterProductsByCustomerLevel = 1
+	LEFT JOIN dbo.ProductAffiliate pa WITH (NOLOCK) ON p.ProductID = pa.ProductID
+		WHERE Published = 1 AND Deleted = 0
+		 AND CASE
+			 WHEN @FilterProductsByCustomerLevel = 0 THEN 1
+			 WHEN @CustomerLevelFilteringIsAscending = 1 AND pcl.CustomerLevelID <= @CustomerLevelID OR pcl.CustomerLevelID IS NULL THEN 1
+			 WHEN @CustomerLevelID=0 AND pcl.CustomerLevelID IS NULL THEN 1
+			 WHEN @CustomerLevelID IS NULL OR @custlevelcount = 0 THEN 1
+			 WHEN pcl.CustomerLevelID = @CustomerLevelID OR pcl.CustomerLevelID IS NULL THEN 1
+			 ELSE 0
+			  END = 1
+		AND (pa.AffiliateID = @affiliateID OR pa.AffiliateID IS NULL OR @affiliatecount = 0 OR @FilterProductsByAffiliate = 0)
+	GROUP BY p.ProductID
+	ORDER BY COUNT(*) DESC
+		)
+	  )prd ON tp.ProductID = prd.ProductID
+	 LEFT JOIN dbo.ProductManufacturer WITH (NOLOCK) ON tp.ProductID = ProductManufacturer.ProductID
+	 LEFT JOIN dbo.Manufacturer WITH (NOLOCK) ON ProductManufacturer.ManufacturerID = Manufacturer.ManufacturerID
+	      JOIN PRODUCTVARIANT WITH (NOLOCK) ON PRODUCTVARIANT.productid = CAST(tp.ProductID AS INT) AND PRODUCTVARIANT.isdefault = 1 AND PRODUCTVARIANT.Published = 1 AND PRODUCTVARIANT.Deleted = 0
+	INNER JOIN (SELECT DISTINCT a.ProductID
+				  FROM Product a WITH (NOLOCK)
+			 LEFT JOIN ProductStore b WITH (NOLOCK) ON a.ProductID = b.ProductID
+				 WHERE (@filterProduct = 0 OR StoreID = @storeID)) ps ON tp.ProductID = ps.ProductID
+END
+
+IF(@DynamicProductsEnabled = 0 and @ProductsDisplayed > 0)
+BEGIN
+	select TOP (@ProductsDisplayed)
+	           p.ProductID
+			 , p.ProductGUID
+			 , p.ImageFilenameOverride
+			 , p.SKU
+			 , ISNULL(PRODUCTVARIANT.SkuSuffix, '') AS SkuSuffix
+			 , ISNULL(PRODUCTVARIANT.ManufacturerPartNumber, '') AS VariantManufacturerPartNumber
+			 , ISNULL(p.ManufacturerPartNumber, '') AS ManufacturerPartNumber
+		     , ISNULL(PRODUCTVARIANT.Dimensions, '') AS Dimensions
+			 , PRODUCTVARIANT.Weight
+			 , ISNULL(PRODUCTVARIANT.GTIN, '') AS GTIN
+			 , PRODUCTVARIANT.VariantID
+			 , PRODUCTVARIANT.Condition
+			 , p.SEAltText
+			 , p.Name
+			 , p.Description
+			 , ProductManufacturer.ManufacturerID AS ProductManufacturerId
+			 , Manufacturer.Name AS ProductManufacturerName
+			 , Manufacturer.SEName AS ProductManufacturerSEName
+		  FROM dbo.product p WITH (NOLOCK)
+	 LEFT JOIN dbo.ProductManufacturer WITH (NOLOCK) ON p.ProductID = ProductManufacturer.ProductID
+	 LEFT JOIN dbo.Manufacturer WITH (NOLOCK) ON ProductManufacturer.ManufacturerID = Manufacturer.ManufacturerID
+		  JOIN @RelatedProductsTable rp ON p.productid = rp.ProductId
+		  JOIN PRODUCTVARIANT WITH (NOLOCK) ON PRODUCTVARIANT.productid = rp.ProductId AND PRODUCTVARIANT.isdefault = 1 AND PRODUCTVARIANT.Published = 1 AND PRODUCTVARIANT.Deleted = 0
+	 LEFT JOIN dbo.productcustomerlevel pcl WITH (NOLOCK) ON p.productid = pcl.productid AND @FilterProductsByCustomerLevel = 1
+		  JOIN (SELECT p.ProductID
+				  FROM dbo.product p WITH (NOLOCK)
+				  JOIN @RelatedProductsTable rp on p.productid = rp.ProductId
+				  JOIN (SELECT ProductID
+							 , SUM(Inventory) Inventory
+						  FROM dbo.productvariant WITH (NOLOCK)
+					  GROUP BY ProductID) pv ON p.ProductID = pv.ProductID
+					 LEFT JOIN (SELECT pv1.ProductID
+									 , SUM(quan) inventory
+								  FROM dbo.inventory i1 WITH (NOLOCK)
+								  JOIN dbo.productvariant pv1 WITH (NOLOCK) ON pv1.variantid = i1.variantid
+								  JOIN @RelatedProductsTable rp1 ON pv1.productid = rp1.ProductId
+							  GROUP BY pv1.productid) i ON i.productid = p.productid
+								 WHERE CASE p.TrackInventoryBySizeAndColor WHEN 1 THEN ISNULL(i.inventory, 0) ELSE pv.inventory END >= @InvFilter
+								) tp ON p.productid = tp.productid
+					INNER JOIN (SELECT DISTINCT a.ProductID
+								  FROM Product a WITH (NOLOCK)
+							 LEFT JOIN ProductStore b WITH (NOLOCK) ON a.ProductID = b.ProductID
+								 WHERE (@filterProduct = 0 OR StoreID = @storeID)
+								) ps ON p.ProductID = ps.ProductID
+						 WHERE p.published = 1 and p.deleted = 0 and p.productid != @productid
+						   AND CASE
+							   WHEN @FilterProductsByCustomerLevel = 0 THEN 1
+							   WHEN @CustomerLevelFilteringIsAscending = 1 AND pcl.CustomerLevelID <= @CustomerLevelID OR pcl.CustomerLevelID IS NULL THEN 1
+							   WHEN @CustomerLevelID=0 AND pcl.CustomerLevelID IS NULL THEN 1
+							   WHEN @CustomerLevelID IS NULL OR @custlevelcount = 0 THEN 1
+							   WHEN pcl.CustomerLevelID = @CustomerLevelID OR pcl.CustomerLevelID IS NULL THEN 1
+							   else 0
+								end = 1
+END
+GO
+
+--Add statistics
+IF NOT EXISTS (SELECT * FROM sys.stats where Name = '_OR_Aspdnsf_Product_I_P_D_P')
+    CREATE STATISTICS [_OR_Aspdnsf_Product_I_P_D_P] ON [dbo].[Product]([IsFeatured], [Published], [Deleted], [ProductID])
+GO
+IF NOT EXISTS (SELECT * FROM sys.stats where Name = '_OR_Aspdnsf_Profile_C_S_P')
+	CREATE STATISTICS [_OR_Aspdnsf_Profile_C_S_P] ON [dbo].[Profile]([CustomerGUID], [StoreID], [PropertyName])
+GO
+IF NOT EXISTS (SELECT * FROM sys.stats where Name = '_OR_Aspdnsf_ProductVariant_V_P_D')
+    CREATE STATISTICS [_OR_Aspdnsf_ProductVariant_V_P_D] ON [dbo].[ProductVariant]([VariantID], [Published], [Deleted])
+GO
+IF NOT EXISTS (SELECT * FROM sys.stats where Name = '_OR_Aspdnsf_ShoppingCart_S_C_Q')
+    CREATE STATISTICS [_OR_Aspdnsf_ShoppingCart_S_C_Q] ON [dbo].[ShoppingCart]([CustomerID], [Quantity])
+GO
+IF NOT EXISTS (SELECT * FROM sys.stats where Name = '_OR_Aspdnsf_ShoppingCart_I_C_S')
+    CREATE STATISTICS [_OR_Aspdnsf_ShoppingCart_I_C_S] ON [dbo].[ShoppingCart]([IsKit2], [CustomerID], [ShoppingCartRecID])
+GO
+IF NOT EXISTS (SELECT * FROM sys.stats where Name = '_OR_Aspdnsf_ShoppingCart_S_P_V_C_C')
+    CREATE STATISTICS [_OR_Aspdnsf_ShoppingCart_S_P_V_C_C] ON [dbo].[ShoppingCart]([ShoppingCartRecID], [ProductID], [VariantID], [CustomerID], [CartType])
+GO
+
+--Expand monthly maintenance to update stats
+IF EXISTS (select * from dbo.sysobjects where id = object_id(N'[dbo].aspdnsf_MonthlyMaintenance') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
+    drop proc [dbo].aspdnsf_MonthlyMaintenance
+GO
+
+create proc [dbo].[aspdnsf_MonthlyMaintenance]
+--	BACKUP YOUR DB BEFORE USING THIS SCRIPT!
+	@purgeAnonCustomers tinyint = 1,
+	@cleanShoppingCartsOlderThan smallint = 30, -- set to 0 to disable erasing
+	@cleanWishListsOlderThan smallint = 30, -- set to 0 to disable erasing
+	@eraseCCFromAddresses tinyint = 1, -- except those used for recurring billing items!
+	@clearProductViewsOrderThan smallint = 180,
+	@eraseCCFromOrdersOlderThan smallint = 30, -- set to 0 to disable erasing
+	@defragIndexes tinyint = 0,
+	@updateStats tinyint = 0,
+	@purgeDeletedRecords tinyint = 0,-- Purges records in all tables with a deleted flag set to 1
+	@removeRTShippingDataOlderThan smallint = 30, -- set to 0 to disable erasing
+	@clearSearchLogOlderThan smallint = 30,-- set to 0 to disable erasing
+	@cleanOrphanedLocalizedNames tinyint = 0
+as
+begin
+	set nocount on
+
+	-- Clear out failed transactions older than 2 months:
+	delete from FailedTransaction where OrderDate < dateadd(mm,-2,getdate());
+
+	-- Clear out old tx info, not longer needed:
+	update orders set TransactionCommand=NULL, AuthorizationResult=NULL, VoidTXCommand=NULL, VoidTXResult=NULL, CaptureTXCommand=NULL, CaptureTXResult=NULL, RefundTXCommand=NULL, RefundTXResult=NULL where orderdate < dateadd(mm,-2,getdate());
+
+	-- Clean up data in the LocalizedObjectName table for locales that no longer exist
+	if @cleanOrphanedLocalizedNames = 1
+	begin
+		delete from LocalizedObjectName where LocaleId not in (select LocaleSettingID from LocaleSetting);
+	end
+
+	-- clean up all carts (don't touch recurring items or wishlist items however):
+	if @cleanShoppingCartsOlderThan <> 0
+	begin
+		delete dbo.kitcart where (CartType=0 or CartType=101) and CreatedOn < dateadd(d,-@cleanShoppingCartsOlderThan,getdate());
+		delete dbo.ShoppingCart where (CartType=0 or CartType=101) and CreatedOn < dateadd(d,-@cleanShoppingCartsOlderThan,getdate());
+	end
+
+	if @cleanWishListsOlderThan <> 0
+	begin
+		delete dbo.kitcart where CartType=1 and CreatedOn < dateadd(d,-@cleanWishListsOlderThan,getdate());
+		delete dbo.ShoppingCart where CartType=1 and CreatedOn < dateadd(d,-@cleanWishListsOlderThan,getdate());
+	end
+
+	-- purge anon customers:
+	if @purgeAnonCustomers = 1
+	begin
+		-- clean out CIM profiles for orders that were not completed
+		delete dbo.CIM_AddressPaymentProfileMap where customerid not in (select customerid from dbo.customer with (NOLOCK) where IsRegistered=1)
+
+		delete dbo.customer where 
+			IsRegistered=0 and IsAdmin = 0
+			and customerid not in (select customerid from dbo.ShoppingCart with (NOLOCK))
+			and customerid not in (select customerid from dbo.kitcart with (NOLOCK))
+			and customerid not in (select customerid from dbo.orders with (NOLOCK))
+			and customerid not in (select customerid from dbo.rating with (NOLOCK))
+			and customerid not in (select ratingcustomerid from dbo.ratingcommenthelpfulness with (NOLOCK))
+			and customerid not in (select votingcustomerid from dbo.ratingcommenthelpfulness with (NOLOCK))
+	end
+
+	-- clean addresses, except for those that have recurring orders
+	if @eraseCCFromAddresses = 1
+		update [dbo].address set 
+			CardNumber=NULL,
+			CardStartDate=NULL,
+			CardIssueNumber=NULL,
+			CardExpirationMonth=NULL,
+			CardExpirationYear=NULL,
+			eCheckBankABACode=NULL,
+			eCheckBankAccountNumber=NULL
+		where CustomerID not in (select CustomerID from ShoppingCart where CartType=2)
+
+	-- erase credit cards from all orders older than N days:
+	if @eraseCCFromOrdersOlderThan <> 0
+		update [dbo].orders set CardNumber=NULL, eCheckBankABACode=NULL,eCheckBankAccountNumber=NULL
+		where
+			OrderDate < dateadd(d,-@eraseCCFromOrdersOlderThan,getdate())
+
+	-- erase product views both for dynamic
+	if @clearProductViewsOrderThan <> 0
+	begin
+		delete dbo.ProductView where ViewDate < dateadd(d,-@clearProductViewsOrderThan,getdate())
+	end
+
+	-- Nuke deleted stores
+	declare @storeId int
+	select top 1 @storeId = StoreID from Store where Deleted = 1
+	while @@rowcount > 0 begin
+		exec aspdnsf_NukeStore @storeId, 0
+		select top 1 @storeId = StoreID from Store where Deleted = 1
+	end
+
+	if @purgeDeletedRecords = 1 begin
+		delete dbo.Address where deleted = 1
+		delete dbo.Coupon where deleted = 1
+		delete dbo.Customer where deleted = 1
+		delete dbo.Document where deleted = 1
+		delete dbo.News where deleted = 1
+		delete dbo.Product where deleted = 1
+		delete dbo.ProductVariant where deleted = 1 or not exists (select * from dbo.Product where productid = ProductVariant.productid)
+		delete dbo.SalesPrompt where deleted = 1
+		delete dbo.ShippingZone where deleted = 1
+		delete dbo.Topic where deleted = 1
+		delete dbo.Affiliate where deleted = 1
+		delete dbo.Category where deleted = 1
+		delete dbo.CustomerLevel where deleted = 1
+		delete dbo.Distributor where deleted = 1
+		delete dbo.Genre where deleted = 1
+		delete dbo.Library where deleted = 1
+		delete dbo.Manufacturer where deleted = 1
+		delete dbo.Section where deleted = 1
+		delete dbo.Vector where deleted = 1
+		delete dbo.ProductVector where not exists (select * from dbo.product where productid = ProductVector.productid) or not exists (select * from dbo.vector where vectorid = ProductVector.vectorid)
+		delete dbo.ProductAffiliate where not exists (select * from dbo.product where productid = ProductAffiliate.productid) or not exists (select * from dbo.Affiliate where Affiliateid = ProductAffiliate.Affiliateid)
+		delete dbo.ProductCategory where not exists (select * from dbo.product where productid = ProductCategory.productid) or not exists (select * from dbo.Category where Categoryid = ProductCategory.Categoryid)
+		delete dbo.ProductCustomerLevel where not exists (select * from dbo.product where productid = ProductCustomerLevel.productid) or not exists (select * from dbo.CustomerLevel where CustomerLevelid = ProductCustomerLevel.CustomerLevelid)
+		delete dbo.ProductDistributor where not exists (select * from dbo.product where productid = ProductDistributor.productid) or not exists (select * from dbo.Distributor where Distributorid = ProductDistributor.Distributorid)
+		delete dbo.ProductGenre where not exists (select * from dbo.product where productid = ProductGenre.productid) or not exists (select * from dbo.Genre where Genreid = ProductGenre.Genreid)
+		delete dbo.ProductLocaleSetting where not exists (select * from dbo.product where productid = ProductLocaleSetting.productid) or not exists (select * from dbo.LocaleSetting where LocaleSettingid = ProductLocaleSetting.LocaleSettingid)
+		delete dbo.ProductManufacturer where not exists (select * from dbo.product where productid = ProductManufacturer.productid) or not exists (select * from dbo.Manufacturer where Manufacturerid = ProductManufacturer.Manufacturerid)
+		delete dbo.ProductSection where not exists (select * from dbo.product where productid = ProductSection.productid) or not exists (select * from dbo.Section where Sectionid = ProductSection.Sectionid)
+	end
+
+	-- Clear out all customer sessions
+	truncate table CustomerSession
+
+	-- Clean up abandon records tied to customers that no longer exist
+	delete from dbo.ShoppingCart where CustomerID not in (select distinct CustomerID from Customer);
+	delete from dbo.KitCart where ShoppingCartRecID not in (select distinct ShoppingCartRecID from ShoppingCart);
+	delete from dbo.CustomerSession where CustomerID not in (select distinct CustomerID from Customer);
+	delete from dbo.RatingCommentHelpfulness where RatingCustomerID not in (select distinct CustomerID from Customer);
+	delete from dbo.RatingCommentHelpfulness where VotingCustomerID not in (select distinct CustomerID from Customer);
+	delete from dbo.PromotionUsage where CustomerID not in (select distinct CustomerID from Customer);
+	delete from dbo.Address where CustomerID not in (select distinct CustomerID from Customer);
+	delete from dbo.Rating where CustomerID not in (select distinct CustomerID from Customer);
+
+	-- Remove old rtshipping requests and responses
+	if @removeRTShippingDataOlderThan <> 0
+	begin
+		update dbo.Customer set RTShipRequest = '', RTShipResponse = ''
+		where CreatedOn < dateadd(d,-@removeRTShippingDataOlderThan,getdate())
+
+		update dbo.Orders set RTShipRequest = '', RTShipResponse = ''
+		where OrderDate < dateadd(d,-@removeRTShippingDataOlderThan,getdate())
+	end
+
+	-- Search log
+	if @clearSearchLogOlderThan <> 0
+	begin
+		delete from dbo.SearchLog where CreatedOn < dateadd(d,-@clearSearchLogOlderThan,getdate())
+	end
+
+	-- Defrag indexes
+	if @defragIndexes = 1
+	begin
+		create table #SHOWCONTIG (
+			tblname varchar (255),
+			ObjectId int,
+			IndexName varchar (255),
+			IndexId int,
+			Lvl int,
+			CountPages int,
+			CountRows int,
+			MinRecSize int,
+			MaxRecSize int,
+			AvgRecSize int,
+			ForRecCount int,
+			Extents int,
+			ExtentSwitches int,
+			AvgFreeBytes int,
+			AvgPageDensity int,
+			ScanDensity decimal,
+			BestCount int,
+			ActualCount int,
+			LogicalFrag decimal,
+			ExtentFrag decimal)
+
+		select [name] tblname into #tmp from dbo.sysobjects with (nolock) where type = 'u' order by Name
+		
+		declare @cmd varchar(max)
+		declare @tblname varchar(255), @indexname varchar(255)
+		select top 1 @tblname = tblname from #tmp
+		while @@rowcount > 0 begin
+			set @cmd = 'DBCC SHOWCONTIG (''' + @tblname + ''') with tableresults, ALL_INDEXES'
+			insert #SHOWCONTIG
+			exec (@cmd)
+			delete #tmp where tblname = @tblname
+			select top 1 @tblname = tblname from #tmp
+		end
+
+		delete #SHOWCONTIG where LogicalFrag < 5 or Extents = 1 or IndexId in (0, 255)
+
+		select top 1 @tblname = tblname, @indexname = IndexName from #SHOWCONTIG order by IndexId
+		while @@rowcount > 0 begin
+			set @cmd = 'DBCC DBREINDEX (''' + @tblname + ''', ''' + @indexname + ''', 90)  '
+			exec (@cmd)
+			delete #SHOWCONTIG where tblname = @tblname
+			select top 1 @tblname = tblname, @indexname = IndexName from #SHOWCONTIG order by IndexId
+		end;
+	end
+
+	--Update statistics, including ones that updating indexes misses
+	if @updateStats = 1
+	begin
+		exec sp_updatestats @resample = 'resample'
+	end
+end
+go
+
+--Tuning for aspdnsf_ProductSequence
+IF EXISTS (select * from dbo.sysobjects where id = object_id(N'[dbo].aspdnsf_ProductSequence') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
+    drop proc [dbo].aspdnsf_ProductSequence
+GO
+
+create proc [dbo].[aspdnsf_ProductSequence]
+    @positioning varchar(10), -- allowed values: first, next, previous, last
+    @ProductID int,
+    @EntityName varchar(20),
+    @EntityID int,
+    @ProductTypeID int = null,
+    @IncludeKits tinyint = 1 ,
+    @SortByLooks tinyint = 0,
+    @CustomerLevelID int = null,
+    @affiliateID     int = null,
+    @StoreID	int = null,
+    @FilterProductsByStore tinyint = 0,
+    @FilterOutOfStockProducts tinyint = 0
+
+AS
+BEGIN
+    SET NOCOUNT ON
+
+    DECLARE @id int, @row int
+    DECLARE @affiliatecount int
+    CREATE TABLE #sequence (row int identity not null, productid int not null)
+
+    DECLARE @FilterProductsByAffiliate tinyint, @FilterProductsByCustomerLevel tinyint, @HideProductsWithLessThanThisInventoryLevel int, @CustomerLevelFilteringIsAscending bit
+
+    SET @FilterProductsByCustomerLevel = (SELECT TOP 1 case ConfigValue when 'true' then 1 else 0 end FROM dbo.AppConfig with (nolock) WHERE [Name] = 'FilterProductsByCustomerLevel' AND (StoreID=@storeID OR StoreID=0) ORDER BY StoreID desc)
+    SET @FilterProductsByAffiliate = (SELECT TOP 1 case ConfigValue when 'true' then 1 else 0 end FROM dbo.AppConfig with (nolock) WHERE [Name] = 'FilterProductsByAffiliate' AND (StoreID=@storeID OR StoreID=0) ORDER BY StoreID desc)
+    SET @HideProductsWithLessThanThisInventoryLevel = (SELECT TOP 1 case ConfigValue when -1 then 0 else ConfigValue end FROM dbo.AppConfig with (nolock) WHERE [Name] = 'HideProductsWithLessThanThisInventoryLevel' AND (StoreID=@storeID OR StoreID=0) ORDER BY StoreID desc)
+
+    SET @CustomerLevelFilteringIsAscending  = 0
+    SET @CustomerLevelFilteringIsAscending = (SELECT TOP 1 case ConfigValue when 'true' then 1 else 0 end FROM dbo.AppConfig with (nolock) WHERE [Name] = 'FilterByCustomerLevelIsAscending' AND (StoreID=@storeID OR StoreID=0) ORDER BY StoreID desc)
+
+    select @affiliatecount = COUNT(*) FROM ProductAffiliate
+
+    IF @positioning not in ('first', 'next', 'previous', 'last')
+        SET @positioning = 'first'
+
+    insert #sequence (productid)
+    select pe.productid
+    from dbo.ProductEntity             pe  with (nolock)
+        join [dbo].Product             p   with (nolock) on p.ProductID = pe.ProductID and pe.EntityType = @EntityName and pe.EntityID = @EntityID
+        left join ProductCustomerLevel pcl with (nolock) on p.ProductID = pcl.ProductID
+        left join ProductAffiliate     pa  with (nolock) on p.ProductID = pa.ProductID
+		left join ProductVariant pv		   with (nolock) on p.ProductID = pv.ProductID  and pv.IsDefault = 1
+        left join (select VariantID, sum(quan) quan from dbo.Inventory with (nolock) group by VariantID) i  on pv.VariantID = i.VariantID
+    where p.ProductTypeID = coalesce(nullif(@ProductTypeID, 0), p.ProductTypeID) and p.Deleted = 0 and p.Published = 1 and p.IsAKit <= @IncludeKits
+          and (case
+                when @FilterProductsByCustomerLevel = 0 then 1
+                when @CustomerLevelFilteringIsAscending = 1 and pcl.CustomerLevelID <= @CustomerLevelID or pcl.CustomerLevelID is null then 1
+                when @CustomerLevelID=0 and pcl.CustomerLevelID is null then 1
+                when pcl.CustomerLevelID = @CustomerLevelID or pcl.CustomerLevelID is null then 1
+                else 0
+               end  = 1
+              )
+          and (pa.AffiliateID = @affiliateID or pa.AffiliateID is null or @affiliatecount = 0 or @FilterProductsByAffiliate = 0)
+          and ((case p.TrackInventoryBySizeAndColor when 1 then isnull(i.quan, 0) else pv.inventory end >= @HideProductsWithLessThanThisInventoryLevel) OR @FilterOutOfStockProducts = 0)
+		  and (p.ProductID IN (SELECT ProductID FROM ProductStore WHERE StoreID=@StoreID) OR @FilterProductsByStore = 0)
+	order by pe.DisplayOrder, p.Name
+
+    SELECT @row = row FROM #sequence WHERE ProductID = @ProductID
+
+    IF @positioning = 'next' BEGIN
+        SELECT top 1 @id = ProductID
+        FROM #sequence
+        WHERE row > @row
+        ORDER BY row
+
+        IF @id is null
+            SET @positioning = 'first'
+    END
+
+    IF @positioning = 'previous' BEGIN
+        SELECT top 1 @id = ProductID
+        FROM #sequence
+        WHERE row < @row
+        ORDER BY row desc
+
+        IF @id is null
+            SET @positioning = 'last'
+    END
+
+    IF @positioning = 'first'
+        SELECT top 1 @id = ProductID
+        FROM #sequence
+        ORDER BY row
+
+    IF @positioning = 'last'
+        SELECT top 1 @id = ProductID
+        FROM #sequence
+        ORDER BY row desc
+
+    SELECT ProductID, SEName FROM dbo.Product with (nolock) WHERE ProductID = @id
+END
+GO
+
+update appconfig set description = 'If Yes, the merchant gateway IS called when processing an order. If No, then the merchant gateway code is bypassed, and an OK status is returned. No is acceptable for development/testing. Almost always must be yes for a ''live'' store site.' where name = 'UseLiveTransactions'
+update appconfig set description = 'If Yes, https links will be used for shoppingcart pages, account pages, receipt pages, etc. Only set this value Yes AFTER you have your Secure Certificate (SSL cert) installed on your live server. SSL also is ONLY invoked on the live server, not the development or staging servers, so make sure your LiveServer setting is also set to yourdomain.com.' where name = 'UseSSL'
+update appconfig set description = 'If Yes, the MaxMind fraud prevention score will be checked before a credit card is sent to the gateway. If the returned FraudScore exceeds AppLogic.MaxMind.FailScoreThreshold, the order will be failed. See MaxMind.com for more documentation. This feature uses MaxMind''s minFraud service version 1.3' where name = 'MaxMind.Enabled'
+update appconfig set description = 'Enables customers to check out using PayPal Express without being a registered customer. If this setting is Yes, then also set AllowCustomerDuplicateEMailAddresses setting to Yes.' where name = 'PayPal.Express.AllowAnonCheckout'
+update appconfig set description = 'Set to Yes to put Checkout By Amazon services in sandbox mode.' where name = 'CheckoutByAmazon.UseSandbox'
+update appconfig set description = 'If Yes, will force PayPal & PayPal Express Checkout payments to Capture, regardless of TransactionMode. If No, these payments will honor the TransactionMode setting.' where name = 'PayPal.ForceCapture'
+update appconfig set description = 'If Yes, the PayPal Express checkout button appears on the shopping cart page. You must also properly configure your PayPal API credentials.' where name = 'PayPal.Express.ShowOnCartPage'
+update appconfig set description = 'To require the customer to check out only with a Confirmed PayPal Shipping Address set to Yes, to allow any address, set to No. It is recommended that this be set to Yes for Seller Protection.' where name = 'PayPal.RequireConfirmedAddress'
+update appconfig set description = 'Set to Yes to use PayPal Instant Notifications to capture payments.' where name = 'PayPal.UseInstantNotification'
+update appconfig set description = 'If Yes (not recommended), customer credit card information is encrypted and stored in the database. If No, credit card information is not stored anywhere within AspDotNetStorefront. We highly recommend setting this value to No and not storing credit card information unless you have a specific reason to do so (e.g. recurring orders, and even then only under certain circumstances). Note that CCV codes are never stored anywhere within AspDotNetStorefront.' where name = 'StoreCCInDB'
+update appconfig set description = 'If Yes, a javascript validator will execute on any page which requires credit card entry, in order to enforce the number is valid.' where name = 'ValidateCreditCardNumbers'
+update appconfig set description = 'If this is set to Yes and MicroPay is enabled as a payment method, the "add $5 to your micropay" Product line item will NOT appear on the shopping cart page. This is helpful if the store administrator is controlling their micropay balance using some other means.' where name = 'Micropay.HideOnCartPage'
+update appconfig set description = 'If Yes and Micropay is enabled as a payment method, the user''s current Micropay balance appears at the top of the shopping cart page. If No, Micropay balance does not appear.' where name = 'Micropay.ShowTotalOnTopOfCartPage'
+update appconfig set description = 'Set to Yes to enable Authorize.net CIM' where name = 'AUTHORIZENET_Cim_Enabled'
+update appconfig set description = 'Set to Yes to use Authorize.net CIM in sandbox mode.' where name = 'AUTHORIZENET_Cim_UseSandbox'
+update appconfig set description = 'Set to Yes if you want the Authorize.net gateway to validate the customer billing address against the credit card. Note that this may decrease fraud, but may also cause valid transactions fail.' where name = 'AUTHORIZENET_Verify_Addresses'
+update appconfig set description = 'Set to Yes if you want the eProcessingNetwork gateway to validate customer billing address against the credit card. Note that this may decrease fraud, but may also cause valid transactions to fail if they have different punctuation than on their credit card.' where name = 'eProcessingNetwork_Verify_Addresses'
+update appconfig set description = 'Set to Yes to use the Simulator URLs. This overrides both the Live and Test URLs.' where name = 'SagePayUK.UseSimulator'
+
+/*********** End 9.5.1.0 Changes *********************/
+
 PRINT CHAR(10)
 PRINT '*****Finalizing database upgrade*****'
 -- Update database indexes
@@ -16722,7 +16962,8 @@ PRINT 'Updating database indexes...'
 EXEC [dbo].[aspdnsf_UpdateIndexes]
 -- Update store version
 PRINT 'Updating Store Version...'
-UPDATE [dbo].[AppConfig] SET [ConfigValue] = '9.5.0.0' WHERE [Name] = 'StoreVersion'
-
-
+UPDATE [dbo].[AppConfig] SET [ConfigValue] = '9.5.1.0' WHERE [Name] = 'StoreVersion'
 print '*****Database Upgrade Completed*****'
+
+SET NOEXEC OFF
+GO

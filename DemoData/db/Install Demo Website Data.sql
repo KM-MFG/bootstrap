@@ -5437,14 +5437,3 @@ update [dbo].ProductVariant set Name='',Description='',SKUSuffix='',Price=5.00,I
 GO
 update [dbo].Product set IsSystem=1 where SKU='MICROPAY';
 go
-
-
-
-
-
-
-
-
-
-
-

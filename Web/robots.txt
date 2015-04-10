@@ -69,6 +69,7 @@ Disallow: /popup.aspx
 Disallow: /ratecomment.aspx
 Disallow: /rateit.aspx
 Disallow: /receipt.aspx
+Disallow: /refreshsession.aspx
 Disallow: /refused.htm
 Disallow: /remove.aspx
 Disallow: /reorder.aspx

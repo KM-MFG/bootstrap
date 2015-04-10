@@ -225,7 +225,7 @@ namespace AspDotNetStorefront
             {
                 valReqSkipRegEmail.Enabled = AppLogic.AppConfigBool("AnonCheckoutReqEmail");
                 String emailx = ThisCustomer.EMail;
-                txtSkipRegEmail.Text = Server.HtmlEncode(emailx).ToLowerInvariant().Trim();
+                txtSkipRegEmail.Text = emailx.ToLowerInvariant().Trim();
 
                 Literal2.Visible = AppLogic.AppConfigBool("RequireOver13Checked");
                 SkipRegOver13.Visible = AppLogic.AppConfigBool("RequireOver13Checked");

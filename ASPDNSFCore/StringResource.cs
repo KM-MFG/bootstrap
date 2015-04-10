@@ -5,17 +5,15 @@
 // THE ABOVE NOTICE MUST REMAIN INTACT. 
 // --------------------------------------------------------------------------------
 using System;
+using System.Collections;
+using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
-using System.Collections.Generic;
-using System.Text;
-using System.Collections;
-using System.Web;
-using System.Linq;
-using AspDotNetStorefrontCommon;
-using AspDotNetStorefrontExcelWrapper;
-using System.Xml;
 using System.IO;
+using System.Linq;
+using System.Xml;
+using System.Xml.Linq;
+using AspDotNetStorefrontExcelWrapper;
 
 namespace AspDotNetStorefrontCore
 {
@@ -371,6 +369,252 @@ namespace AspDotNetStorefrontCore
         }
     }
 
+	/// <summary>
+	/// Imports a .csv or .xlsx file into the StringResources table.
+	/// </summary>
+	public class StringResourceImporter
+	{
+		[Flags]
+		public enum ImportOption
+		{
+			Default = 0,
+			LeaveModified = 1,
+			OverWrite = 2
+		}
+
+		/// <summary>
+		/// Load the indicated spreadsheets and return a DataTable with the status of each line. Does NOT actually update the StringResources table.
+		/// </summary>
+		/// <param name="localeSetting">The .NET locale code, e.g. "en-US"</param>
+		/// <param name="paths">The filesystem paths to the spreadsheets to import</param>
+		/// <param name="options">Import options flags</param>
+		/// <returns>A DataTable of the imported data with the status of each line.</returns>
+		public DataTable Validate(string localeSetting, IEnumerable<string> paths, ImportOption options)
+		{
+			return Import(localeSetting, paths, options, true);
+		}
+
+		/// <summary>
+		/// Import the indicated spreadsheets into the StringResources table.
+		/// </summary>
+		/// <param name="localeSetting"></param>
+		/// <param name="paths"></param>
+		/// <param name="options"></param>
+		/// <returns></returns>
+		public DataTable Import(string localeSetting, IEnumerable<string> paths, ImportOption options)
+		{
+			return Import(localeSetting, paths, options, false);
+		}
+
+		DataTable Import(string localeSetting, IEnumerable<string> paths, ImportOption options, bool dryRun)
+		{
+			// Convert spreadsheets to a single DataTable
+			var importData = ConvertToDataTable(paths);
+
+			// Validate and, if dryRun = false, import the DataTable
+			var result = LoadDataTable(localeSetting, importData, options, dryRun);
+			
+			return result;
+		}
+
+		DataTable ConvertToDataTable(IEnumerable<string> paths)
+		{
+			var dataTable = new DataTable
+			{
+				Columns = {
+						new DataColumn("A"),
+						new DataColumn("B"),
+						new DataColumn("C"),
+					}
+			};
+
+			// Merge each file into a single DataTable
+			foreach(var path in paths)
+			{
+				var convertedDataTable = String.Equals(Path.GetExtension(path), ".csv", StringComparison.OrdinalIgnoreCase)
+					? ConvertCsvToDataTable(path)
+					: ConvertXlsxToDataTable(path);
+
+				foreach(DataRow row in convertedDataTable.Rows)
+					dataTable.Rows.Add(row[0], row[1], row[2]);
+			}
+
+			return dataTable;
+		}
+
+		DataTable ConvertCsvToDataTable(string path)
+		{
+			using(var stream = File.Open(path, FileMode.Open, FileAccess.Read))
+			using(var reader = new StreamReader(stream))
+				return CsvParser.Parse(reader, false);
+		}
+
+		DataTable ConvertXlsxToDataTable(string path)
+		{
+			// Parse XLSX to XML
+			var legacyXmlDoc = new ExcelToXml(path).LoadSheet("Sheet1", "C", 5000, "A");
+			var nodeReader = new XmlNodeReader(legacyXmlDoc);
+			nodeReader.MoveToContent();
+			var doc = XDocument.Load(nodeReader);
+			var rows = doc
+				.Element("excel")
+				.Element("sheet")
+				.Elements("row");
+
+			// Load XML into a DataTable
+			var dataTable = new DataTable
+			{
+				Columns = {
+						new DataColumn("A"),
+						new DataColumn("B"),
+						new DataColumn("C"),
+					}
+			};
+
+			foreach(var row in rows)
+				dataTable.Rows.Add(
+					(string)row.Elements("col").Where(xe => (string)xe.Attribute("id") == "A").FirstOrDefault(),
+					(string)row.Elements("col").Where(xe => (string)xe.Attribute("id") == "B").FirstOrDefault(),
+					(string)row.Elements("col").Where(xe => (string)xe.Attribute("id") == "C").FirstOrDefault());
+
+			return dataTable;
+		}
+
+		DataTable LoadDataTable(string localeSetting, DataTable importData, ImportOption options, bool dryRun)
+		{
+			var importResult = new DataTable
+				{
+					Columns = 
+						{
+							new DataColumn("Index", typeof(int)),
+							new DataColumn("Status", typeof(string)),
+							new DataColumn("Name", typeof(string)),
+							new DataColumn("Value", typeof(string)),
+							new DataColumn("LocaleSetting", typeof(string)),
+							new DataColumn("StoreId", typeof(int)),
+						},
+				};
+
+			using(var connection = DB.dbConn())
+			{
+				connection.Open();
+
+				var index = 0;
+				foreach(DataRow row in importData.Rows)
+				{
+					var name = row.Field<string>("A");
+					var value = row.Field<string>("B");
+
+					int storeId;
+					if(!int.TryParse(row.Field<string>("C"), out storeId))
+						storeId = AppLogic.StoreID();
+
+					var status = LoadLine(name, value, localeSetting, storeId, options, dryRun, connection);
+
+					importResult.Rows.Add(
+						index,
+						status,
+						name,
+						value,
+						localeSetting,
+						storeId);
+
+					index++;
+				}
+			}
+
+			return importResult;
+		}
+
+		string LoadLine(string name, string configValue, string localeSetting, int storeId, ImportOption options, bool preview, SqlConnection connection)
+		{
+			if(String.IsNullOrEmpty(name))
+				return AppLogic.ro_OK;
+
+			try
+			{
+				var existing = false;
+				var modified = false;
+				var resourceGuid = string.Empty;
+
+				// Check if the string resource exists and what its status is
+				using(var command = new SqlCommand())
+				{
+					command.Connection = connection;
+					command.CommandText =
+						@"select Name, Modified, StringResourceGuid 
+						from StringResource 
+						where Name = @name AND LocaleSetting = @localeSetting and StoreId = @storeId";
+
+					command.Parameters.AddRange(new[]
+						{
+							new SqlParameter("@name", name),
+							new SqlParameter("@localeSetting", localeSetting),
+							new SqlParameter("@storeId", storeId),
+						});
+
+					using(var reader = command.ExecuteReader())
+						if(reader.Read())
+						{
+							existing = true;
+							modified = DB.RSFieldTinyInt(reader, "Modified") > 0;
+							resourceGuid = DB.RSFieldGUID(reader, "StringResourceGuid");
+						}
+				}
+
+				// Execute behavior based on the status of the string resource
+				if(!existing)
+				{
+					if(!preview)
+						InsertStringResource(name, localeSetting, configValue, storeId);
+
+					return AppLogic.ro_OK;
+				}
+
+				if(modified && ((options & ImportOption.LeaveModified) == ImportOption.LeaveModified))
+					return AppLogic.GetString("admin.importstringresourcefile2.NotImported", Customer.Current.SkinID, Customer.Current.LocaleSetting);
+
+				if((options & ImportOption.OverWrite) == ImportOption.OverWrite)
+				{
+					if(!preview)
+					{
+						DeleteStringResource(resourceGuid);
+						InsertStringResource(name, localeSetting, configValue, storeId);
+					}
+
+					return AppLogic.ro_OK;
+				}
+
+				return AppLogic.GetString("admin.importstringresourcefile2.NotImportedDuplicate", Customer.Current.SkinID, Customer.Current.LocaleSetting);
+			}
+			catch(Exception exception)
+			{
+				return CommonLogic.GetExceptionDetail(exception, "<br/>");
+			}
+		}
+
+		void DeleteStringResource(string stringResourceGuid)
+		{
+			DB.ExecuteSQL(
+				@"delete StringResource where StringResourceGuid = @stringResourceGuid",
+				new[] { new SqlParameter("@stringResourceGuid", stringResourceGuid) });
+		}
+
+		void InsertStringResource(string name, string localeSetting, string configValue, int storeId)
+		{
+			DB.ExecuteSQL(
+				@"insert into StringResource(StringResourceGUID, Name, LocaleSetting, ConfigValue, StoreID) 
+					values(newid(), @name, @localeSetting, @configValue, @storeId)",
+				new[]
+					{
+						new SqlParameter("@name", name),
+						new SqlParameter("@localeSetting", localeSetting),
+						new SqlParameter("@configValue", configValue),
+						new SqlParameter("@storeId", storeId),
+					});
+		}
+	}
+
     public static class StringResourceManager
     {
         private static Dictionary<int, StringResources> storeStrings = new Dictionary<int, StringResources>();
@@ -417,7 +661,7 @@ namespace AspDotNetStorefrontCore
                         {
                             // there doesn't seem to be any string resources for this locale in the db table, so try to load them from the 
                             // excel spreadsheet for this locale:
-                            LoadStringResourceExcelFile(locale);
+                            LoadStringResourceSpreadsheets(locale);
                         }
                     }
 
@@ -472,67 +716,47 @@ namespace AspDotNetStorefrontCore
             return locales;
         }
 
-        /// <summary>
-        /// Determines if a given locale contains any string resource files in the
-        /// [appRoot]/StringResources folder
-        /// </summary>
-        /// <param name="locale">The locale to look for string resource files for</param>
-        /// <returns>Returns true if ANY string resource files exist for a given locale.
-        /// Else, returns false.</returns>
-        public static bool CheckStringResourceExcelFileExists(string locale)
-        {
-            return GetStringResourceFilesForLocale(locale).Count > 0;
-        }
+		/// <summary>
+		/// Determines if a given locale contains any string resource files in the
+		/// [appRoot]/StringResources folder
+		/// </summary>
+		/// <param name="locale">The locale to look for string resource files for</param>
+		/// <returns>Returns true if ANY string resource files exist for a given locale.
+		/// Else, returns false.</returns>
+		public static bool CheckStringResourceExcelFileExists(string locale)
+		{
+			return GetStringResourceFilesForLocale(locale).Any();
+		}
 
-        /// <summary>
-        /// Returns a string array of filenames containing all string resource excel files for a given locale
-        /// </summary>
-        /// <param name="locale">Locale to retrieve string resource files for</param>
-        /// <returns></returns>
-        public static List<String> GetStringResourceFilesForLocale(string locale)
-        {
-            List<string> files = new List<string>();
-            files.AddRange(Directory.GetFiles(CommonLogic.SafeMapPath("~/stringresources"), "*." + locale + ".xls", SearchOption.TopDirectoryOnly));
-            return files;
-        }
+		/// <summary>
+		/// Returns a string array of filenames containing all string resource excel files for a given locale
+		/// </summary>
+		/// <param name="locale">Locale to retrieve string resource files for</param>
+		/// <returns>A collection of paths to the string resource files for the given locale.</returns>
+		public static IEnumerable<string> GetStringResourceFilesForLocale(string locale)
+		{
+			return Directory.GetFiles(CommonLogic.SafeMapPath("~/stringresources"), "*." + locale + ".csv", SearchOption.TopDirectoryOnly)
+				.Concat(Directory.GetFiles(CommonLogic.SafeMapPath("~/stringresources"), "*." + locale + ".xls", SearchOption.TopDirectoryOnly));
+		}
 
-        static public void LoadStringResourceExcelFile(String LocaleSetting)
-        {
-            //Find all string resource excel files in <appRoot>/StringResources pertaining to the specified locale
-            String[] files = GetStringResourceFilesForLocale(LocaleSetting).ToArray();
+		static public void LoadStringResourceSpreadsheets(string localeSetting)
+		{
+			if(!CheckStringResourceExcelFileExists(localeSetting))
+				return;
 
-            bool fileExists = CheckStringResourceExcelFileExists(LocaleSetting);
+			// Find all string resource excel files in <appRoot>/StringResources pertaining to the specified locale
+			var files = GetStringResourceFilesForLocale(localeSetting);
 
-            if (fileExists)
-            {
-                ExcelToXml exf = new ExcelToXml(files);
-                XmlDocument xmlDoc = exf.LoadSheet("Sheet1", "C", 5000, "A");
-                foreach (XmlNode row in xmlDoc.SelectNodes("/excel/sheet/row"))
-                {
-                    String StrKey = exf.GetCell(row, "A");
-                    String StrVal = exf.GetCell(row, "B");
-                    String StrStoreId = AppLogic.DefaultStoreID().ToString();
-
-                    if (StrKey.Length != 0)
-                    {
-                        if(!String.IsNullOrEmpty(exf.GetCell(row, "C")))
-                        {
-                            StrStoreId = exf.GetCell(row, "C");
-                        }
-
-                        String sql = String.Format("insert StringResource(StoreId, Name,LocaleSetting,ConfigValue) values({0},{1},{2}, {3})", DB.SQuote(StrStoreId), DB.SQuote(StrKey), DB.SQuote(LocaleSetting), DB.SQuote(StrVal));
-                        try
-                        {
-                            DB.ExecuteSQL(sql);
-                        }
-                        catch (Exception ex)
-                        {
-                            SysLog.LogException(ex, MessageTypeEnum.DatabaseException, MessageSeverityEnum.Alert);
-                        }
-                    }
-                }
-            }
-        }
+			try
+			{
+				var importer = new StringResourceImporter();
+				importer.Import(localeSetting, files, StringResourceImporter.ImportOption.Default);
+			}
+			catch(Exception ex)
+			{
+				SysLog.LogException(ex, MessageTypeEnum.DatabaseException, MessageSeverityEnum.Alert);
+			}
+		}
 
         public static bool HasAnyStrings()
         {

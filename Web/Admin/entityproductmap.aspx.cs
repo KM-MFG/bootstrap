@@ -100,6 +100,10 @@ namespace AspDotNetStorefrontAdmin
 		void SetMap(SqlConnection connection, string entityType, int entityId, int productId, bool setAsMapped)
 		{
 			var entityTableName = GetEntityTableName(entityType);
+
+			if(entityType.ToLowerInvariant() == "manufacturer")
+				DB.ExecuteSQL(String.Format("delete from {0} where ProductId = {1}", entityTableName, productId));
+
 			var sql = setAsMapped
 				? String.Format("insert into {0} values(@productId, @entityId, 0, getdate(), getdate())", entityTableName)
 				: String.Format("delete from {0} where {1}Id = @entityId and ProductId = @productId", entityTableName, entityType);

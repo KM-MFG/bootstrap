@@ -173,13 +173,13 @@ namespace AspDotNetStorefront
                 EMail.Text = ThisCustomer.EMail.ToLowerInvariant().Trim();
                 AffPassword.Text = String.Empty;
                 AffPassword2.Text = String.Empty;
-                Company.Text = Server.HtmlEncode(BillingAddress.Company);
-                Address1.Text = Server.HtmlEncode(BillingAddress.Address1);
-                Address2.Text = Server.HtmlEncode(BillingAddress.Address2);
-                Suite.Text = Server.HtmlEncode(BillingAddress.Suite);
-                City.Text = Server.HtmlEncode(BillingAddress.City);
-                Zip.Text = Server.HtmlEncode(BillingAddress.Zip);
-                Phone.Text = Server.HtmlEncode(BillingAddress.Phone);
+                Company.Text = BillingAddress.Company;
+                Address1.Text = BillingAddress.Address1;
+                Address2.Text = BillingAddress.Address2;
+                Suite.Text = BillingAddress.Suite;
+                City.Text = BillingAddress.City;
+                Zip.Text = BillingAddress.Zip;
+                Phone.Text = BillingAddress.Phone;
             }
 
             AppLogic.GetButtonDisable(btnJoin);

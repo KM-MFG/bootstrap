@@ -811,7 +811,7 @@ namespace AspDotNetStorefrontAdmin
 			strScript += "theForm." + ShippingPhone.ClientID + ".value = theForm." + BillingPhone.ClientID + ".value;";
 			strScript += "theForm." + ShippingCompany.ClientID + ".value = theForm." + BillingCompany.ClientID + ".value;";
 			strScript += "theForm." + ShippingCompany.ClientID + ".value = theForm." + BillingCompany.ClientID + ".value;";
-			strScript += "theForm." + ShippingResidenceType.ClientID + "selectedIndex =  theForm." + BillingResidenceType.ClientID + ".selectedIndex;";
+			strScript += "theForm." + ShippingResidenceType.ClientID + ".selectedIndex =  theForm." + BillingResidenceType.ClientID + ".selectedIndex;";
 			strScript += "theForm." + ShippingAddress1.ClientID + ".value = theForm." + BillingAddress1.ClientID + ".value;";
 			strScript += "theForm." + ShippingAddress2.ClientID + ".value = theForm." + BillingAddress2.ClientID + ".value;";
 			strScript += "theForm." + ShippingSuite.ClientID + ".value = theForm." + BillingSuite.ClientID + ".value;";

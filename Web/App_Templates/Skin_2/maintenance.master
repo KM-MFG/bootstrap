@@ -25,9 +25,6 @@
     <script type="text/javascript" src="App_Templates/Skin_<asp:Literal runat="server" Text="<%$ Tokens:SKINID%>" />/MPTools.js"></script>
 
 	<script type="text/javascript" src="jscripts/core.js"></script>
-
-	<%--This xmlpackage can be used to add dynamic data to javascripts such as tracking scripts that should run before the closing head tag--%>
-	<aspdnsf:XmlPackage runat="server" PackageName="script.headclose" />
 </head>
 <body style="min-width: 320px;">
 	<%--This xmlpackage can be used to add dynamic data to javascripts such as tracking scripts that should run just after the opening body tag--%>

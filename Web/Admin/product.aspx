@@ -33,10 +33,12 @@
 				<aspdnsf:AlertMessage runat="server" ID="ctrlAlertMessage" />
 			</div>
 			<div class="item-action-bar clearfix">
-				<asp:Panel ID="pnlLocale" runat="server" CssClass="other-actions">
-					<asp:Label runat="server" Text="<%$Tokens:StringResource, admin.stringresources.Locale %>" AssociatedControlID="ddLocale" />
-					<asp:DropDownList ID="ddLocale" runat="server" AutoPostBack="true" OnSelectedIndexChanged="ddLocale_SelectedIndexChanged" />
-				</asp:Panel>
+				<div class="other-actions">
+					<asp:Panel ID="Panel1" runat="server" Visible='<%# LocaleSelector.HasMultipleLocales() %>'>
+						<asp:Label runat="server" Text="<%$Tokens:StringResource, admin.stringresources.Locale %>" AssociatedControlID="LocaleSelector" />
+						<aspdnsf:LocaleSelector ID="LocaleSelector" runat="server" OnSelectedLocaleChanged="LocaleSelector_SelectedLocaleChanged" />
+					</asp:Panel>
+				</div>
 
 				<asp:HyperLink runat="server"
 					CssClass="btn btn-default"
@@ -100,6 +102,16 @@
 										<asp:RequiredFieldValidator ControlToValidate="txtName" CssClass="text-danger" ErrorMessage="Please enter the Product Name (Main Tab)"
 											ID="rfvName" ValidationGroup="Main" EnableClientScript="true" SetFocusOnError="true"
 											runat="server" Display="Static">!!</asp:RequiredFieldValidator>
+										<asp:CustomValidator runat="server"
+											ID="NameLengthValidator"
+											ValidationGroup="Main" 
+											ControlToValidate="txtName"
+											OnServerValidate="NameLength_ServerValidate"
+											ErrorMessage="The product name is too long (Main Tab)"
+											CssClass="text-danger" 
+											SetFocusOnError="true"
+											Text="!!"
+											Display="Static" />
 									</td>
 								</tr>
 								<tr>
@@ -518,18 +530,10 @@
 							<table class="table table-detail">
 								<tr>
 									<td>
-										<asp:Literal ID="ltSummary" runat="Server" />
-										<telerik:radeditor id="radSummary" runat="server" editable="true">
-											<ImageManager UploadPaths="~/Images" ViewPaths="~/Images" DeletePaths="~/Images" />
-											<DocumentManager UploadPaths="~/Images" ViewPaths="~/Images" DeletePaths="~/Images" />
-											<FlashManager UploadPaths="~/Images" ViewPaths="~/Images" DeletePaths="~/Images" />
-											<MediaManager UploadPaths="~/Images" ViewPaths="~/Images" DeletePaths="~/Images" />
-											<SilverlightManager UploadPaths="~/Images" ViewPaths="~/Images" DeletePaths="~/Images" />
-											<TemplateManager UploadPaths="~/Images" ViewPaths="~/Images" DeletePaths="~/Images" />
-											<Modules>
-												<telerik:EditorModule Name="RadEditorToolZone" Enabled="false" Visible="false" />
-											</Modules>
-										</telerik:radeditor>
+										<div class="form-group">
+											<asp:TextBox ID="txtSummaryNoHtmlEditor" Rows="15" TextMode="MultiLine" runat="server" Visible="false" CssClass="form-control" />
+										</div>
+										<telerik:radeditor id="radSummary" runat="server" editable="true" SkinID="RadEditorSettings" />
 										<br />
 										<asp:Literal ID="ltSummaryAuto" runat="server" />
 									</td>
@@ -542,18 +546,10 @@
 							<table class="table table-detail">
 								<tr>
 									<td>
-										<asp:Literal ID="ltDescription" runat="Server" />
-										<telerik:radeditor id="radDescription" runat="server" editable="true">
-											<ImageManager UploadPaths="~/Images" ViewPaths="~/Images" DeletePaths="~/Images" />
-											<DocumentManager UploadPaths="~/Images" ViewPaths="~/Images" DeletePaths="~/Images" />
-											<FlashManager UploadPaths="~/Images" ViewPaths="~/Images" DeletePaths="~/Images" />
-											<MediaManager UploadPaths="~/Images" ViewPaths="~/Images" DeletePaths="~/Images" />
-											<SilverlightManager UploadPaths="~/Images" ViewPaths="~/Images" DeletePaths="~/Images" />
-											<TemplateManager UploadPaths="~/Images" ViewPaths="~/Images" DeletePaths="~/Images" />
-											<Modules>
-												<telerik:EditorModule Name="RadEditorToolZone" Enabled="false" Visible="false" />
-											</Modules>
-										</telerik:radeditor>
+										<div class="form-group">
+											<asp:TextBox ID="txtDescriptionNoHtmlEditor" Rows="15" TextMode="MultiLine" runat="server" Visible="false" CssClass="form-control" />
+										</div>
+										<telerik:radeditor id="radDescription" runat="server" editable="true" SkinID="RadEditorSettings" />
 									</td>
 								</tr>
 							</table>
@@ -604,9 +600,7 @@
 								<tr>
 									<td>
 										<div class="form-group">
-											<div class="col-sm-6">
-												<asp:TextBox CssClass="form-control multiExtension" ID="txtFroogle" runat="Server" TextMode="multiLine" />
-											</div>
+											<asp:TextBox CssClass="form-control multiExtension" ID="txtFroogle" runat="Server" TextMode="multiLine" />
 										</div>
 									</td>
 								</tr>

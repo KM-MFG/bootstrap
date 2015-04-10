@@ -68,7 +68,13 @@ namespace AspDotNetStorefrontCore
 
 		string GetXmlPackageDisplayName(string packageName, int? skinId)
 		{
-			var xmlpackage = new XmlPackage2(packageName, skinId ?? AppLogic.DefaultSkinID());
+			var xmlpackage = new XmlPackage2(packageName,
+											((AspDotNetStorefrontPrincipal)HttpContext.Current.User).ThisCustomer,
+											skinId ?? AppLogic.DefaultSkinID(),
+											String.Empty,
+											String.Empty,
+											"QueryThatDoesNotExistSoThisNewsUpFaster");
+
 			return xmlpackage.DisplayName;
 		}
 

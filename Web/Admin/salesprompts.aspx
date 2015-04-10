@@ -1,71 +1,82 @@
 <%@ Page Language="C#" AutoEventWireup="true" CodeFile="salesprompts.aspx.cs" Inherits="AspDotNetStorefrontAdmin.salesprompts" MasterPageFile="~/App_Templates/Admin_Default/AdminMaster.master" %>
 
+<%@ Register TagPrefix="aspdnsf" Assembly="AspDotNetStorefrontControls" Namespace="AspDotNetStorefrontControls.Listing" %>
+<%@ Register TagPrefix="aspdnsf" TagName="StringFilter" Src="Controls/Listing/StringFilter.ascx" %>
+<%@ Register TagPrefix="aspdnsf" TagName="BooleanFilter" Src="Controls/Listing/BooleanFilter.ascx" %>
+<%@ Register TagPrefix="aspdnsf" TagName="DataQueryFilter" Src="Controls/Listing/DataQueryFilter.ascx" %>
 <%@ Register TagPrefix="aspdnsf" TagName="LinkGroupProducts" Src="Controls/LinkGroupProducts.ascx" %>
 
 <asp:Content runat="server" ContentPlaceHolderID="bodyContentPlaceholder">
 	<h1>
 		<i class="fa fa-cube"></i>
-		<asp:Literal runat="server" ID="litHeader" />
+		<asp:Literal runat="server" Text="<%$ Tokens:StringResource, admin.common.Products %>" />
+		<asp:Literal runat="server" Text="<%$ Tokens:StringResource, admin.common.breadcrumbseparator %>" />
+		<asp:Literal runat="server" Text="<%$ Tokens:StringResource, admin.menu.salesprompts %>" />
 	</h1>
+
 	<aspdnsf:AlertMessage runat="server" ID="ctrlAlertMessage" />
 
-	<div id="container">
-		<asp:Panel runat="server" ID="pnlGrid" DefaultButton="btnInsert">
-			<div class="item-action-bar">
-				<aspdnsf:LinkGroupProducts runat="server" ID="LinkGroupProducts" SelectedLink="salesprompts.aspx" />
-				<asp:Button runat="server" ID="btnInsert" CssClass="btn btn-action" Text="<%$Tokens:StringResource, admin.editsalesprompt.CreateSalesPrompt %>" OnClick="btnInsert_Click" />
-			</div>
+	<aspdnsf:FilteredListing runat="server"
+		ID="FilteredListing"
+		SqlQuery="
+			select {0}
+				SalesPromptID,
+				nullif(dbo.GetMlValue(Name, @_locale),'') [Name]
+			from
+				SalesPrompt 
+			where 
+				Deleted = 0 
+				and {1}"
+		SortExpression="nullif(dbo.GetMlValue(Name, @_locale),'')"
+		LocaleSelectionEnabled="true">
+		<ActionBarTemplate>
+			<aspdnsf:LinkGroupProducts runat="server" SelectedLink="salesprompts.aspx" />
+			<asp:HyperLink runat="server" CssClass="btn btn-action" Text="<%$ Tokens:StringResource, admin.editsalesprompt.CreateSalesPrompt %>" NavigateUrl="SalesPrompt.aspx" />
+		</ActionBarTemplate>
+		<ListingTemplate>
 			<div class="white-ui-box">
-
-				<asp:GridView ID="gMain" runat="server"
+				<asp:GridView runat="server"
+					CssClass="table js-sortable-gridview"
+					DataSourceID="FilteredListingDataSource"
 					AutoGenerateColumns="False"
-					CssClass="table"
-					OnRowCancelingEdit="gMain_RowCancelingEdit"
-					OnRowCommand="gMain_RowCommand"
-					OnRowDataBound="gMain_RowDataBound"
-					OnRowUpdating="gMain_RowUpdating"
-					OnRowEditing="gMain_RowEditing"
-					CellPadding="0"
-					GridLines="None"
-					AllowPaging="true" 
-					AllowSorting="true" 
-					OnSorting="gMain_Sorting">
+					OnRowCommand="RowCommand"
+					AllowSorting="true"
+					GridLines="None">
+					<EmptyDataTemplate>
+						<div class="alert alert-info">
+							<asp:Literal runat="server" Text="<%$ Tokens:StringResource, admin.common.EmptyDataTemplate.NoResults %>" />
+						</div>
+					</EmptyDataTemplate>
 					<Columns>
-						<asp:BoundField DataField="SalesPromptID" HeaderText="ID" ReadOnly="True" SortExpression="SalesPromptID" />
-						<asp:TemplateField HeaderText="Sales Prompt" SortExpression="Name">
+						<asp:BoundField
+							HeaderText="ID"
+							HeaderStyle-Width="5%"
+							SortExpression="SalesPromptID"
+							DataField="SalesPromptID" />
+
+						<asp:HyperLinkField
+							HeaderText="Sales Prompt"
+							SortExpression="nullif(dbo.GetMlValue(Name, @_locale),'')"
+							DataTextField="Name"
+							DataNavigateUrlFields="SalesPromptID"
+							DataNavigateUrlFormatString="SalesPrompt.aspx?SalesPromptId={0}"
+							Text="<%$Tokens:StringResource, admin.nolinktext %>" />
+
+						<asp:TemplateField
+							HeaderStyle-Width="5%">
 							<ItemTemplate>
-								<asp:Literal runat="server" ID="ltName" Text='<%# DataBinder.Eval(Container.DataItem, "Name") %>' />
-							</ItemTemplate>
-							<EditItemTemplate>
-								<%# DataBinder.Eval(Container.DataItem, "EditName") %>
-							</EditItemTemplate>
-						</asp:TemplateField>
-						<asp:TemplateField HeaderText="<%$ Tokens: StringResource, admin.common.Delete %>">
-							<ItemTemplate>
-								<asp:LinkButton ID="Delete" CommandName="DeleteItem" CommandArgument='<%# Eval("SalesPromptID") %>' runat="Server" Text='<i class="fa fa-times"></i> Delete' CssClass="delete-link" />
+								<asp:LinkButton runat="Server"
+									CssClass="delete-link fa-times"
+									ToolTip="Delete"
+									CommandName="<%# DeleteCommand %>"
+									CommandArgument='<%# Eval("SalesPromptID") %>'
+									OnClientClick="return confirm('Are you sure you want to delete this sales prompt?')"
+									Text="<%$Tokens:StringResource, admin.common.Delete %>" />
 							</ItemTemplate>
 						</asp:TemplateField>
-						<asp:BoundField Visible="False" DataField="EditName" ReadOnly="True" />
-						<asp:CommandField HeaderText="<%$ Tokens: StringResource, admin.common.Edit %>" ItemStyle-Width="10%" ButtonType="Link" ShowEditButton="True" ControlStyle-CssClass="edit-link" CancelText='<i class="fa fa-reply"></i> Cancel' EditText='<i class="fa fa-share"></i> Edit' UpdateText='<i class="fa fa-floppy-o"></i> Save' />
 					</Columns>
-					<SelectedRowStyle CssClass="grid-view-action" />
 				</asp:GridView>
 			</div>
-			<div class="item-action-bar">
-				<aspdnsf:LinkGroupProducts runat="server" SelectedLink="salesprompts.aspx" />
-				<asp:Button runat="server" CssClass="btn btn-action" Text="<%$Tokens:StringResource, admin.common.addnew %>" OnClick="btnInsert_Click" />
-			</div>
-		</asp:Panel>
-		<asp:Panel ID="pnlAdd" runat="server" DefaultButton="btnSubmit">
-			<div class="white-ui-box">
-				<label>Sales Prompt:</label>
-				<asp:Literal ID="ltPrompt" runat="server" />
-				<asp:ValidationSummary ValidationGroup="gAdd" ID="validationSummary" runat="server" EnableClientScript="true" ShowMessageBox="true" ShowSummary="false" Enabled="true" />
-			</div>
-			<div class="item-action-bar">
-				<asp:Button ValidationGroup="gAdd" CssClass="btn btn-primary btn-sm" ID="btnSubmit" runat="server" OnClick="btnSubmit_Click" Text="Save" />
-				<asp:Button ID="btnCancel" CssClass="btn btn-default btn-sm" runat="server" Text="Cancel" OnClick="btnCancel_Click" />
-			</div>
-		</asp:Panel>
-	</div>
+		</ListingTemplate>
+	</aspdnsf:FilteredListing>
 </asp:Content>

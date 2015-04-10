@@ -1996,12 +1996,13 @@ namespace AspDotNetStorefrontCore
 			tmpS.Append("<div class=\"recurring-buttons\">");
             if (ShowCancelButton && !IsPayPalPaymentsStandardOrder)
             {
-                tmpS.Append(" <input type=\"button\" class=\"button stop-button\" value=\"");
-                tmpS.Append("Stop Future Billing");
-                tmpS.Append("\" onClick=\"if(confirm('");
-                tmpS.Append(AppLogic.GetString("shoppingcart.cs.14", m_SkinID, m_ThisCustomer.LocaleSetting));
-                tmpS.Append("')) {self.location='");
-                tmpS.Append("account.aspx?deleteid=" + co.OriginalRecurringOrderNumber.ToString() + "';}\">");
+				var deletePage = AppLogic.IsAdminSite
+					? "customer_history"
+					: "account";
+
+                tmpS.Append(" <input type=\"button\" class=\"button stop-button\" value=\"Stop Future Billing\"");
+				tmpS.AppendFormat(" onClick=\"if(confirm('{0}'))", AppLogic.GetString("shoppingcart.cs.14", m_SkinID, m_ThisCustomer.LocaleSetting));
+                tmpS.AppendFormat(" {{self.location='{0}.aspx?deleteid={1}';}}\">", deletePage, co.OriginalRecurringOrderNumber);
             }
 
             if (!isPPECorder && originalOrder.PaymentGateway != "PAYPAL" && !IsPayPalPaymentsStandardOrder && !AppLogic.IsAdminSite)
@@ -7033,7 +7034,7 @@ namespace AspDotNetStorefrontCore
                 using (SqlConnection con = new SqlConnection(DB.GetDBConn()))
                 {
                     con.Open();
-                    using (IDataReader rscart = DB.GetRS("select * from ShoppingCart where ShoppingCartRecID=" + CartRecID.ToString() + " and VariantID = " + VariantID.ToString(), con))
+					using(IDataReader rscart = DB.GetRS(String.Format("select TextOption, Quantity, ChosenSize, ChosenColor, ProductPrice from ShoppingCart where ShoppingCartRecID = {0} and VariantID = {1}", CartRecID, VariantID), con))
                     {
                         if (rscart.Read())
                         {
@@ -7080,17 +7081,19 @@ namespace AspDotNetStorefrontCore
             using (SqlConnection con = new SqlConnection(DB.GetDBConn()))
             {
                 con.Open();
-                using (IDataReader rs = DB.GetRS("select PV.*,P.*, pv.Sizes MLSizes, pv.Colors MLColors, p.ColorOptionPrompt MLColorOptionPrompt, p.SizeOptionPrompt MLSizeOptionPrompt, p.TextOptionPrompt MLTextOptionPrompt, p.TextOptionMaxLength from Product P  with (NOLOCK)  left outer join productvariant PV  with (NOLOCK)  on p.productid=pv.productid where PV.ProductID=P.ProductID and pv.VariantID=" + VariantID.ToString(), con))
+				using(IDataReader rs = DB.GetRS(String.Format("SELECT ShowBuyButton, IsCallToOrder, SKU, SkuSuffix, CustomerEntersPrice, CustomerEntersPricePrompt, RestrictedQuantities, MinimumQuantity, TrackInventoryBySizeAndColor, TrackInventoryByColor, TrackInventoryBySize, Colors, ColorSKUModifiers, ColorOptionPrompt, Sizes, SizeSKUModifiers, SizeOptionPrompt, TextOptionPrompt, TextOptionMaxLength, TaxClassID, IsRecurring, IsDownload, RequiresTextOption from Product P  with (NOLOCK) left outer join productvariant PV  with (NOLOCK) on p.productid=pv.productid where PV.ProductID=P.ProductID and pv.VariantID={0}", VariantID), con))
                 {
                     if (!rs.Read())
                     {
                         rs.Close();
                         return String.Empty;
                     }
+
                     if (!AppLogic.AppConfigBool("ShowBuyButtons") || !DB.RSFieldBool(rs, "showbuybutton") || AppLogic.HideForWholesaleSite(ThisCustomer.CustomerLevelID))
                     {
                         return string.Empty;
                     }
+
                     if (DB.RSFieldBool(rs, "IsCallToOrder"))
                     {
                         return "<div class='call-to-order-wrap' id='" + FormName + "'>" + AppLogic.GetString("common.cs.67", SkinID, LocaleSetting) + "</div>";
@@ -7106,16 +7109,16 @@ namespace AspDotNetStorefrontCore
                     TrackInventoryBySizeAndColor = DB.RSFieldBool(rs, "TrackInventoryBySizeAndColor");
 
                     TrackInventoryByColor = DB.RSFieldBool(rs, "TrackInventoryByColor");
-                    ColorsMaster = DB.RSFieldByLocale(rs, "MLColors", Localization.GetDefaultLocale()).Trim();
-                    ColorsDisplay = DB.RSFieldByLocale(rs, "MLColors", LocaleSetting).Trim();
+                    ColorsMaster = DB.RSFieldByLocale(rs, "Colors", Localization.GetDefaultLocale()).Trim();
+                    ColorsDisplay = DB.RSFieldByLocale(rs, "Colors", LocaleSetting).Trim();
                     ColorSKUModifiers = DB.RSField(rs, "ColorSKUModifiers").Trim();
-                    ColorOptionPrompt = DB.RSFieldByLocale(rs, "MLColorOptionPrompt", LocaleSetting).Trim();
+                    ColorOptionPrompt = DB.RSFieldByLocale(rs, "ColorOptionPrompt", LocaleSetting).Trim();
 
                     TrackInventoryBySize = DB.RSFieldBool(rs, "TrackInventoryBySize");
-                    SizesMaster = DB.RSFieldByLocale(rs, "MLSizes", Localization.GetDefaultLocale()).Trim();
-                    SizesDisplay = DB.RSFieldByLocale(rs, "MLSizes", LocaleSetting).Trim();
+                    SizesMaster = DB.RSFieldByLocale(rs, "Sizes", Localization.GetDefaultLocale()).Trim();
+                    SizesDisplay = DB.RSFieldByLocale(rs, "Sizes", LocaleSetting).Trim();
                     SizeSKUModifiers = DB.RSField(rs, "SizeSKUModifiers").Trim();
-                    SizeOptionPrompt = DB.RSFieldByLocale(rs, "MLSizeOptionPrompt", LocaleSetting).Trim();
+                    SizeOptionPrompt = DB.RSFieldByLocale(rs, "SizeOptionPrompt", LocaleSetting).Trim();
 
                     if (SizesDisplay.Length == 0)
                     {
@@ -7131,7 +7134,7 @@ namespace AspDotNetStorefrontCore
                     HasColorPriceModifiers = ColorsMaster.IndexOf('[') != -1;
                     boardSuffix = string.Format("_{0}_{1}", ProductID.ToString(), VariantID.ToString());
 
-                    TextOptionPrompt = DB.RSFieldByLocale(rs, "MLTextOptionPrompt", LocaleSetting).Trim();
+                    TextOptionPrompt = DB.RSFieldByLocale(rs, "TextOptionPrompt", LocaleSetting).Trim();
                     TextOptionMaxLength = DB.RSFieldInt(rs, "TextOptionMaxLength");
 
                     TaxClassID = DB.RSFieldInt(rs, "TaxClassID");

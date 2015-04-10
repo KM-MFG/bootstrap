@@ -9,6 +9,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Data;
+using System.Data.Linq;
 using System.Data.SqlClient;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -826,26 +827,6 @@ namespace AspDotNetStorefrontCore
 			}
 		}
 
-
-		public static bool ProductHasVisibleBuyButton(int ProductID)
-		{
-			bool tmp = true;
-
-			using(SqlConnection con = new SqlConnection(DB.GetDBConn()))
-			{
-				con.Open();
-				using(IDataReader rs = DB.GetRS("select * from Product  with (NOLOCK)  where ProductID=" + ProductID.ToString(), con))
-				{
-					if(rs.Read())
-					{
-						tmp = DB.RSFieldBool(rs, "ShowBuyButton") && !DB.RSFieldBool(rs, "IsCallToOrder");
-					}
-				}
-			}
-
-			return tmp;
-		}
-
 		public static bool VariantAllowsCustomerPricing(int VariantID)
 		{
 			bool tmp = false;
@@ -1211,7 +1192,7 @@ namespace AspDotNetStorefrontCore
 		}
 
 		static public void EnsureProductHasADefaultVariantSet(int ProductID)
-		{			
+		{
 			if(DB.GetSqlN(string.Format("SELECT COUNT(VariantID) AS N FROM ProductVariant WHERE Deleted=0 AND ProductID={0} AND IsDefault=1", ProductID.ToString())) == 0)
 			{
 				// force a default variant, none was specified!
@@ -1349,12 +1330,34 @@ namespace AspDotNetStorefrontCore
 
 		public static int SessionTimeout()
 		{
-			int ST = AppLogic.AppConfigUSInt("SessionTimeoutInMinutes");
-			if(ST == 0)
+			var sessionTimeout = AppLogic.AppConfigUSInt("SessionTimeoutInMinutes");
+
+			return GetSessionTimeout(sessionTimeout);
+		}
+
+		public static int AdminSessionTimeout()
+		{
+			var adminSessionTimeout = AppLogic.AppConfigUSInt("AdminSessionTimeoutInMinutes");
+
+			return GetSessionTimeout(adminSessionTimeout);
+		}
+
+		static int GetSessionTimeout(int sessionTimeout) {
+
+			if(sessionTimeout < 1)
 			{
-				ST = 20;
+				sessionTimeout = 15;
 			}
-			return ST;
+			else if(sessionTimeout == 1)
+			{
+				sessionTimeout = 2;
+			}
+			else if (sessionTimeout > 999999) 
+			{
+				sessionTimeout = 999999;
+			}
+
+			return sessionTimeout;
 		}
 
 		public static int CacheDurationMinutes()
@@ -1753,30 +1756,30 @@ namespace AspDotNetStorefrontCore
 			}
 		}
 
-		static public String FormLocaleXml(String FieldLocaleVal, string locale)
+		static public string FormLocaleXml(string fieldLocaleVal, string locale)
 		{
-			if(AppLogic.NumLocaleSettingsInstalled() > 1)
+			if(AppLogic.NumLocaleSettingsInstalled() <= 1)
+				return fieldLocaleVal;
+
+			var mlDataBuilder = new StringBuilder(4096);
+			var allLocaleNames = Localization
+				.GetLocales()
+				.AsEnumerable()
+				.Select(row => row.Field<string>("Name"));
+
+			mlDataBuilder.Append("<ml>");
+			foreach(var iteratedLocaleName in allLocaleNames)
 			{
-				StringBuilder tmpS = new StringBuilder(4096);
-				tmpS.Append("<ml>");
-				XmlNodeList nl = Localization.LocalesDoc.SelectNodes("//Locales");
-				foreach(XmlNode xn in nl)
-				{
-					String thisLocale = xn.Attributes["Name"].InnerText;
-					tmpS.Append("<locale name=\"" + thisLocale + "\">");
-					if(thisLocale == locale)
-					{
-						tmpS.Append(XmlCommon.XmlEncode(FieldLocaleVal));
-					}
-					tmpS.Append("</locale>");
-				}
-				tmpS.Append("</ml>");
-				return tmpS.ToString();
+				mlDataBuilder.AppendFormat("<locale name=\"{0}\">", iteratedLocaleName);
+
+				if(iteratedLocaleName == locale)
+					mlDataBuilder.Append(XmlCommon.XmlEncode(fieldLocaleVal));
+
+				mlDataBuilder.Append("</locale>");
 			}
-			else
-			{
-				return FieldLocaleVal;
-			}
+			mlDataBuilder.Append("</ml>");
+
+			return mlDataBuilder.ToString();
 		}
 
 		static public String FormLocaleXml(string sqlName, string formValue, string locale, EntitySpecs eSpecs, int eID)
@@ -1815,47 +1818,35 @@ namespace AspDotNetStorefrontCore
 			}
 		}
 
-		static public String FormLocaleXml(string sqlName, string formValue, string locale, string table, int eID)
+		static public string FormLocaleXml(string sqlName, string formValue, string locale, string table, int eID)
 		{
-			if(AppLogic.NumLocaleSettingsInstalled() > 1)
-			{
-				//gets the current DB value
-				string sqlNameValue = DB.GetSqlSAllLocales("SELECT " + sqlName + " AS S FROM " + table + " WHERE " + table + "ID=" + eID.ToString());
-
-				StringBuilder tmpS = new StringBuilder(4096);
-				tmpS.Append("<ml>");
-				XmlNodeList nl = Localization.LocalesDoc.SelectNodes("//Locales");
-				foreach(XmlNode xn in nl)
-				{
-					String thisLocale = xn.Attributes["Name"].InnerText;
-					string localeEntry = XmlCommon.GetLocaleEntry(sqlNameValue, thisLocale, false);
-					if(thisLocale.Equals(locale, StringComparison.InvariantCultureIgnoreCase))
-					{
-						tmpS.Append("<locale name=\"" + thisLocale + "\">");
-						tmpS.Append(XmlCommon.XmlEncode(formValue));
-						tmpS.Append("</locale>");
-					}
-					else
-					{
-						tmpS.Append("<locale name=\"" + thisLocale + "\">");
-						if(localeEntry.Length == 0)
-						{
-							XmlCommon.XmlEncode(formValue);
-						}
-						else
-						{
-							tmpS.Append(XmlCommon.XmlEncode(localeEntry));
-						}
-						tmpS.Append("</locale>");
-					}
-				}
-				tmpS.Append("</ml>");
-				return tmpS.ToString();
-			}
-			else
-			{
+			if(AppLogic.NumLocaleSettingsInstalled() <= 1)
 				return formValue;
+
+			var mlDataBuilder = new StringBuilder(4096);
+			var currentMlData = DB.GetSqlSAllLocales(String.Format("SELECT {0} AS S FROM {1} WHERE {1}ID = {2}", sqlName, table, eID));
+			var allLocaleNames = Localization
+				.GetLocales()
+				.AsEnumerable()
+				.Select(row => row.Field<string>("Name"));
+
+			mlDataBuilder.Append("<ml>");
+			foreach(var iteratedLocaleName in allLocaleNames)
+			{
+				var iteratedLocaleEntry = XmlCommon.GetLocaleEntry(currentMlData, iteratedLocaleName, false);
+
+				mlDataBuilder.AppendFormat("<locale name=\"{0}\">", iteratedLocaleName);
+
+				if(iteratedLocaleName.Equals(locale, StringComparison.OrdinalIgnoreCase))
+					mlDataBuilder.Append(XmlCommon.XmlEncode(formValue));
+				else if(iteratedLocaleEntry.Length > 0)
+					mlDataBuilder.Append(XmlCommon.XmlEncode(iteratedLocaleEntry));
+
+				mlDataBuilder.Append("</locale>");
 			}
+			mlDataBuilder.Append("</ml>");
+
+			return mlDataBuilder.ToString();
 		}
 
 		static public String FormLocaleXmlVariant(string sqlName, string formValue, string locale, int eID)
@@ -1938,41 +1929,14 @@ namespace AspDotNetStorefrontCore
 			}
 		}
 
-		static public String FormLocaleXmlEditor(string sqlName, string formName, string locale, string table, int eID)
+		static public string FormLocaleXmlEditor(string sqlName, string formName, string locale, string table, int eID)
 		{
-			if(AppLogic.NumLocaleSettingsInstalled() > 1)
-			{
-				//gets the current DB value
-				string sqlNameValue = DB.GetSqlSAllLocales("SELECT " + sqlName + " AS S FROM " + table + " WHERE " + table + "ID=" + eID.ToString());
-
-				StringBuilder tmpS = new StringBuilder(4096);
-				tmpS.Append("<ml>");
-				XmlNodeList nl = Localization.LocalesDoc.SelectNodes("//Locales");
-				foreach(XmlNode xn in nl)
-				{
-					String thisLocale = xn.Attributes["Name"].InnerText;
-					string localeEntry = XmlCommon.GetLocaleEntry(sqlNameValue, thisLocale, false);
-
-					if(thisLocale.Equals(locale, StringComparison.InvariantCultureIgnoreCase))
-					{
-						tmpS.Append("<locale name=\"" + thisLocale + "\">");
-						tmpS.Append(XmlCommon.XmlEncode(CommonLogic.FormCanBeDangerousContent(formName)));
-						tmpS.Append("</locale>");
-					}
-					else
-					{
-						tmpS.Append("<locale name=\"" + thisLocale + "\">");
-						tmpS.Append(XmlCommon.XmlEncode(localeEntry));
-						tmpS.Append("</locale>");
-					}
-				}
-				tmpS.Append("</ml>");
-				return tmpS.ToString();
-			}
-			else
-			{
-				return CommonLogic.FormCanBeDangerousContent(formName);
-			}
+			return FormLocaleXml(
+				sqlName: sqlName, 
+				formValue: CommonLogic.FormCanBeDangerousContent(formName),
+				locale: locale,
+				table: table,
+				eID: eID);
 		}
 
 		static public String FormLocaleXmlEditorVariant(string sqlName, string formName, string locale, int eID)
@@ -2680,7 +2644,7 @@ namespace AspDotNetStorefrontCore
 
 						if(!string.IsNullOrEmpty(firstName))
 						{
-							sb.AppendFormat("<b>First Name:</b> {0}{1}", firstName, separator);							
+							sb.AppendFormat("<b>First Name:</b> {0}{1}", firstName, separator);
 						}
 						if(!string.IsNullOrEmpty(lastName))
 						{
@@ -2690,7 +2654,7 @@ namespace AspDotNetStorefrontCore
 						{
 							sb.AppendFormat("<b>Company:</b> {0}{1}", company, separator);
 						}
-						if((!string.IsNullOrEmpty(firstName) || !string.IsNullOrEmpty(lastName) || !string.IsNullOrEmpty(company)) && 
+						if((!string.IsNullOrEmpty(firstName) || !string.IsNullOrEmpty(lastName) || !string.IsNullOrEmpty(company)) &&
 							(!string.IsNullOrEmpty(address1) || !string.IsNullOrEmpty(address2) || !string.IsNullOrEmpty(suite) || !string.IsNullOrEmpty(city) || !string.IsNullOrEmpty(state) || !string.IsNullOrEmpty(zip)))
 						{
 							sb.AppendLine(separator);
@@ -2717,11 +2681,11 @@ namespace AspDotNetStorefrontCore
 						}
 						if(!string.IsNullOrEmpty(state))
 						{
-							sb.AppendFormat("{0} ", state);							
+							sb.AppendFormat("{0} ", state);
 						}
 						if(!string.IsNullOrEmpty(zip))
 						{
-							sb.AppendFormat("{0}", zip);							
+							sb.AppendFormat("{0}", zip);
 						}
 					}
 				}
@@ -3409,7 +3373,7 @@ namespace AspDotNetStorefrontCore
 			using(SqlConnection con = new SqlConnection(DB.GetDBConn()))
 			{
 				con.Open();
-				using(IDataReader rs = DB.GetRS("select * from productvariant   with (NOLOCK)  where VariantID=" + VariantID.ToString(), con))
+				using(IDataReader rs = DB.GetRS(String.Format("select Sizes, Colors from productvariant with (NOLOCK) where VariantID = {0}", VariantID), con))
 				{
 					rs.Read();
 					String Sizes = DB.RSFieldByLocale(rs, "Sizes", Localization.GetDefaultLocale());
@@ -5056,7 +5020,7 @@ namespace AspDotNetStorefrontCore
 			return id;
 		}
 
-		public static int GetProductSequence(string direction, int ProductID, int EntityID, string EntityName, int ProductTypeID, bool SortByLooks, bool includeKits, bool includePacks, Customer cust, out string SEName)
+		public static int GetProductSequence(string direction, int ProductID, int EntityID, string EntityName, int ProductTypeID, bool SortByLooks, bool includeKits, Customer cust, out string SEName)
 		{
 			if(false == direction.Equals("first", StringComparison.InvariantCultureIgnoreCase) &&
 				false == direction.Equals("last", StringComparison.InvariantCultureIgnoreCase) &&
@@ -5071,14 +5035,13 @@ namespace AspDotNetStorefrontCore
 				EntityName = "CATEGORY";
 			}
 
-			String sql = "exec aspdnsf_ProductSequence @positioning, @ProductID, @EntityName, @EntityID, @ProductTypeID, @IncludeKits, @IncludePacks, @SortByLooks, @CustomerLevelID, @affiliateID, @StoreID, @FilterProductsByStore, @FilterOutOfStockProducts";
+			String sql = "exec aspdnsf_ProductSequence @positioning, @ProductID, @EntityName, @EntityID, @ProductTypeID, @IncludeKits, @SortByLooks, @CustomerLevelID, @affiliateID, @StoreID, @FilterProductsByStore, @FilterOutOfStockProducts";
 			SqlParameter[] spa = {DB.CreateSQLParameter("@positioning", SqlDbType.VarChar, 10, direction, ParameterDirection.Input), 
                                   DB.CreateSQLParameter("@ProductID", SqlDbType.Int, 4, ProductID, ParameterDirection.Input), 
                                   DB.CreateSQLParameter("@EntityName", SqlDbType.VarChar, 20, EntityName, ParameterDirection.Input), 
                                   DB.CreateSQLParameter("@EntityID", SqlDbType.Int, 4, EntityID, ParameterDirection.Input), 
                                   DB.CreateSQLParameter("@ProductTypeID", SqlDbType.Int, 4, ProductTypeID, ParameterDirection.Input), 
                                   DB.CreateSQLParameter("@IncludeKits", SqlDbType.Bit, 1, includeKits, ParameterDirection.Input), 
-                                  DB.CreateSQLParameter("@IncludePacks", SqlDbType.Bit, 1, includePacks, ParameterDirection.Input),
                                   DB.CreateSQLParameter("@SortByLooks", SqlDbType.Bit, 1, SortByLooks, ParameterDirection.Input), 
                                   DB.CreateSQLParameter("@CustomerLevelID", SqlDbType.Int, 4, cust.CustomerLevelID, ParameterDirection.Input),
                                   DB.CreateSQLParameter("@affiliateID", SqlDbType.Int, 4, cust.AffiliateID, ParameterDirection.Input),
@@ -8589,6 +8552,26 @@ namespace AspDotNetStorefrontCore
 				false == server.Equals("MAIL.YOURDOMAIN.COM", StringComparison.InvariantCultureIgnoreCase) &&
 				server.Length != 0)
 			{
+				//Ensure that the TO: address string is only a single address
+				var indexOfComma = toaddress.IndexOf(',');
+				var indexOfSemicolon = toaddress.IndexOf(';');
+				if(indexOfComma != -1 || indexOfSemicolon != -1)
+				{
+					var multipleAddresses = toaddress;
+
+					if(indexOfSemicolon != -1)
+						toaddress = multipleAddresses.Substring(0, indexOfSemicolon);
+
+					//Commas win if there happen to be both, it's what we used to say was supported
+					if(indexOfComma != -1)
+						toaddress = multipleAddresses.Substring(0, indexOfComma);
+
+					SysLog.LogMessage("Email was configured to go to multiple addresses, which is not supported.",
+										String.Format("Instead of going to {0}, the email was sent to only {1}.", multipleAddresses, toaddress),
+										MessageTypeEnum.Informational,
+										MessageSeverityEnum.Alert);
+				}
+
 				System.Net.Mail.MailMessage msg = new System.Net.Mail.MailMessage(new MailAddress(fromaddress, fromname), new MailAddress(toaddress, toname));
 				if(ReplyTo.Length != 0)
 				{

@@ -18,5 +18,5 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyCulture("")]
 [assembly: ComVisible(false)]
 [assembly: System.CLSCompliant(true)]
-[assembly: AssemblyVersion("9.5.0.0")]
-[assembly: AssemblyFileVersion("9.5.0.0")]
+[assembly: AssemblyVersion("9.5.1.0")]
+[assembly: AssemblyFileVersion("9.5.1.0")]

@@ -5,9 +5,6 @@
 // THE ABOVE NOTICE MUST REMAIN INTACT. 
 // --------------------------------------------------------------------------------
 using System;
-using System.Web;
-using System.Data;
-using System.Globalization;
 using AspDotNetStorefrontCore;
 
 namespace AspDotNetStorefront
@@ -29,13 +26,12 @@ namespace AspDotNetStorefront
             SectionTitle =  AppLogic.GetString("searchadv.aspx.1",SkinID,ThisCustomer.LocaleSetting);
 
             String st = CommonLogic.QueryStringCanBeDangerousContent("SearchTerm").Trim();
-            if (st.Length != 0)
+			if(st.Length != 0 && AppLogic.AppConfigBool("Search_LogSearches"))
             {
                 DB.ExecuteSQL("insert into SearchLog(SearchTerm,CustomerID,LocaleSetting) values(" + DB.SQuote(CommonLogic.Ellipses(st, 97, true)) + "," + ThisCustomer.CustomerID.ToString() + "," + DB.SQuote(ThisCustomer.LocaleSetting) + ")");
             }
 
 			searchPackage.SetContext = this;
-
 		}
 	}
 }

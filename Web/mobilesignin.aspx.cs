@@ -222,8 +222,6 @@ namespace AspDotNetStorefront
                             return;
                         }
 
-                        int NewCustomerID = signinCustomer.CustomerID;
-
                         if (AppLogic.AppConfigBool("DynamicRelatedProducts.Enabled"))
                         {
                             //A Registered Customer browse the products in store site not yet logged-in, update the productview with the Customer's CustomerGUID when
@@ -231,8 +229,8 @@ namespace AspDotNetStorefront
                             signinCustomer.ReplaceProductViewFromAnonymous();
                         }
 
-                        AppLogic.ExecuteSigninLogic(CurrentCustomerID, NewCustomerID);
-
+						AppLogic.ExecuteSigninLogic(CurrentCustomerID, signinCustomer.CustomerID);
+						signinCustomer.ThisCustomerSession.UpdateCustomerSession(null, null);
 
                         object affiliateIDParameter = null;
 
@@ -507,7 +505,8 @@ namespace AspDotNetStorefront
                         ExecutePanel.Visible = true;
                         pnlChangePwd.Visible = false;
 
-                        AppLogic.ExecuteSigninLogic(CurrentCustomerID, signinCustomer.CustomerID);
+						AppLogic.ExecuteSigninLogic(CurrentCustomerID, signinCustomer.CustomerID);
+						ThisCustomer.ThisCustomerSession.UpdateCustomerSession(null, null);
 
                         String CustomerGUID = signinCustomer.CustomerGUID.Replace("{", "").Replace("}", "");
 

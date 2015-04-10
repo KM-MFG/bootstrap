@@ -56,6 +56,8 @@ namespace AspDotNetStorefront
 
         protected void Page_Load(object sender, System.EventArgs e)
         {
+			Page.ClientScript.RegisterStartupScript(this.GetType(), "sessiontimervars", AddPayPalStyleScript(), true);
+
             MobileHelper.RedirectPageWhenMobileIsDisabled("~/shoppingcart.aspx", ThisCustomer);
 
             this.RequireCustomerRecord();
@@ -828,5 +830,14 @@ namespace AspDotNetStorefront
             UpdateCart();
             BindPromotions();
         }
+
+		string AddPayPalStyleScript()
+		{
+			return String.Format(@"$(document).ready(function () {{
+            						$('.mpPayPalExpressSpan div').removeClass('ui-btn ui-btn-corner-all ui-shadow ui-btn-up-c ui-btn-up-{0}');
+            						$('.mpPayPalExpressSpan span').removeClass('ui-btn-inner ui-btn-corner-all');
+            						$('.mpBtnPayPalExpressCheckout').removeClass('ui-btn-hidden');
+								}});", AppLogic.AppConfig("Mobile.Action.ThemeId"));
+		}
     }
 }

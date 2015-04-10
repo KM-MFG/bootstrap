@@ -1,75 +1,73 @@
-<%@ Page Language="c#" Inherits="AspDotNetStorefrontAdmin.entityBulkDisplayOrder"
+<%@ Page Language="c#" Inherits="AspDotNetStorefrontAdmin.EntityBulkDisplayOrder"
 	CodeFile="entitybulkdisplayorder.aspx.cs" MaintainScrollPositionOnPostback="true" MasterPageFile="~/App_Templates/Admin_Default/AdminMaster.master" %>
 
 <asp:Content ID="Content1" ContentPlaceHolderID="bodyContentPlaceholder" runat="server">
 	<div id="container">
 		<div class="wrapper row" id="divwrapper" runat="server">
-			<asp:Panel ID="pnlSubEntityList" runat="server" Visible="false">
-				<h3>
-					<asp:Label ID="lblpagehdr" runat="server" Visible="false"></asp:Label>
-				</h3>
-				<div class="list-action-bar">
-					<asp:Button ID="btnBackToEntityEdit" runat="server" CssClass="btn btn-default btn-sm" OnClick="btnBackToEntityEdit_Click" />
-					<asp:Button ID="btnTopUpdate" runat="server" Text="Update Order" CssClass="btn btn-default btn-sm" OnClick="UpdateDisplayOrder" />
-				</div>
-				<div class="white-ui-box">
-					<table border="0" style="width: 100%; text-align: left">
-						<asp:Repeater ID="subcategories" runat="server">
-							<HeaderTemplate>
-								<tr class="table-header">
-									<th style="width: 33%">
-										<asp:Label runat="server" Text="<%$Tokens:StringResource, admin.common.ID %>" />
-									</th>
-									<th style="width: 33%">
-										<asp:Label runat="server" Text="<%$Tokens:StringResource, admin.common.Name %>" />
-									</th>
-									<th style="width: 33%">
-										<asp:Label runat="server" Text="<%$Tokens:StringResource, admin.common.DisplayOrder %>" />
-									</th>
-								</tr>
-							</HeaderTemplate>
+			<h1 runat="server" id="header">
+				<i class="fa fa-ellipsis-v"></i>
+				<asp:Label ID="lblHeader" runat="server" Text="<%$Tokens:StringResource, admin.menu.DisplayOrder %>" />
+			</h1>
+
+			<div>
+				<asp:Label ID="lblHeaderTip" runat="server" Text="<%$Tokens:StringResource, admin.displayorder.HeaderTip %>" />
+			</div>
+
+			<aspdnsf:AlertMessage runat="server" ID="AlertMessageDisplay" />
+
+			<div class="list-action-bar">
+				<asp:Panel ID="pnlEntityType" runat="server" CssClass="other-actions" >
+					<asp:Label runat="server" Text="<%$Tokens:StringResource, admin.entity.SelectEntityType %>" AssociatedControlID="ddEntityType" />
+					<asp:DropDownList ID="ddEntityType" runat="server" AutoPostBack="true" OnSelectedIndexChanged="ddEntityType_SelectedIndexChanged" >
+						<asp:ListItem Text="<%$ Tokens:StringResource, admin.menu.Categories %>" Value="Category" Selected="true" />
+						<asp:ListItem Text="<%$ Tokens:StringResource, admin.menu.Manufacturers %>" Value="Manufacturer" />
+						<asp:ListItem Text="<%$ Tokens:StringResource, admin.menu.Sections %>" Value="Section" />
+					</asp:DropDownList>
+				</asp:Panel>
+				<asp:Button ID="btnTopUpdate" runat="server" CausesValidation="true" ValidationGroup="valUpdate" Text="<%$Tokens:StringResource, admin.common.Save %>" CssClass="btn btn-primary" OnClick="UpdateDisplayOrder" />
+			</div>
+
+			<div class="white-ui-box">
+				<asp:GridView runat="server"
+					ID="grdDisplayOrder"
+					CssClass="table js-sortable-gridview"
+					GridLines="None" 
+					DataKeyNames="EntityId"
+					AutoGenerateColumns="false"
+					OnDataBinding="grdDisplayOrder_DataBinding">
+					<EmptyDataTemplate>
+						<div class="alert alert-info">
+							<asp:Literal runat="server" Text="<%$ Tokens:StringResource, admin.common.EmptyDataTemplate.NoResults %>" />
+						</div>
+					</EmptyDataTemplate>
+					<Columns>
+						<asp:HyperLinkField
+							HeaderText="<%$ Tokens: StringResource, admin.common.ID %>"
+							HeaderStyle-Width="7%"
+							DataTextField="EntityID" 
+							DataNavigateUrlFields="EntityID,EntityType"
+							DataNavigateUrlFormatString="entity.aspx?entityid={0}&entityname={1}" />
+
+						<asp:BoundField HeaderText="<%$Tokens:StringResource, admin.common.Name %>" DataField="Name" />
+
+						<asp:TemplateField HeaderText="<%$Tokens:StringResource, admin.common.DisplayOrder %>">
 							<ItemTemplate>
-								<tr class="table-row2">
-									<td>
-										<%# ((System.Xml.XmlNode)Container.DataItem)["EntityID"].InnerText%>
-									</td>
-									<td>
-										<%# getLocaleValue(((System.Xml.XmlNode)Container.DataItem)["Name"], AspDotNetStorefrontCore.Localization.GetDefaultLocale())%>
-									</td>
-									<td>
-										<asp:TextBox ID="DisplayOrder" runat="server" Columns="4" Text='<%# ((System.Xml.XmlNode)Container.DataItem)["DisplayOrder"].InnerText%>'></asp:TextBox>
-										<asp:TextBox ID="entityid" runat="server" Visible="false" Text='<%# ((System.Xml.XmlNode)Container.DataItem)["EntityID"].InnerText%>'></asp:TextBox>
-									</td>
-								</tr>
+								<asp:TextBox ID="txtDisplayOrder" runat="server" CssClass="form-control-short" Text='<%# Eval("DisplayOrder") %>' />
+							<asp:RequiredFieldValidator ErrorMessage="Fill in Display Order!" CssClass="text-danger" 
+								ControlToValidate="txtDisplayOrder" ID="reqDisplayOrder" Display="Dynamic" 
+								ValidationGroup="valUpdate" SetFocusOnError="true" runat="server" />
+							<asp:CompareValidator ErrorMessage="Whole numbers only!" CssClass="text-danger" Operator="DataTypeCheck"
+								 ControlToValidate="txtDisplayOrder" Type="Integer" ValidationGroup="valUpdate" 
+								ID="cmpDisplayOrder" runat="server" Display="Dynamic" />	
 							</ItemTemplate>
-							<AlternatingItemTemplate>
-								<tr class="table-alternatingrow2">
-									<td>
-										<%# ((System.Xml.XmlNode)Container.DataItem)["EntityID"].InnerText%>
-									</td>
-									<td>
-										<%# getLocaleValue(((System.Xml.XmlNode)Container.DataItem)["Name"], "en-US") %>
-									</td>
-									<td>
-										<asp:TextBox ID="DisplayOrder" runat="server" Columns="4" Text='<%# ((System.Xml.XmlNode)Container.DataItem)["DisplayOrder"].InnerText%>'></asp:TextBox>
-										<asp:TextBox ID="entityid" runat="server" Visible="false" Text='<%# ((System.Xml.XmlNode)Container.DataItem)["EntityID"].InnerText%>'></asp:TextBox>
-									</td>
-								</tr>
-							</AlternatingItemTemplate>
-							<FooterTemplate>
-							</FooterTemplate>
-						</asp:Repeater>
-					</table>
-				</div>
-				<div class="list-action-bar">
-					<asp:Button ID="btnBotUpdate" runat="server" Text="Update Order" class="btn btn-default btn-sm"
-						OnClick="UpdateDisplayOrder" />
-				</div>
-			</asp:Panel>
-			<asp:Panel ID="pnlNoSubEntities" runat="server" Visible="true" HorizontalAlign="Center"
-				Style="padding-top: 30px;">
-				<asp:Label ID="lblError" runat="server" Font-Bold="true" Font-Names="verdana"></asp:Label>
-			</asp:Panel>
+						</asp:TemplateField>
+					</Columns>
+				</asp:GridView>
+			</div>
+
+			<div class="list-action-bar">
+				<asp:Button ID="btnBotUpdate" CausesValidation="true" ValidationGroup="valUpdate" runat="server" Text="<%$Tokens:StringResource, admin.common.Save %>" class="btn btn-primary" OnClick="UpdateDisplayOrder" />
+			</div>
 		</div>
 	</div>
 </asp:Content>

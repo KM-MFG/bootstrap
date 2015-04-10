@@ -167,7 +167,8 @@ namespace AspDotNetStorefront
                             c.ReplaceProductViewFromAnonymous();
                         }
 
-                        AppLogic.ExecuteSigninLogic(CurrentCustomerID, NewCustomerID);
+						AppLogic.ExecuteSigninLogic(CurrentCustomerID, NewCustomerID);
+						ThisCustomer.ThisCustomerSession.UpdateCustomerSession(null, null);
 
                         // update the cookie value if present for affiliate
                         int affiliateIDFromCookie = int.Parse(CommonLogic.IIF(CommonLogic.IsInteger(HttpContext.Current.Profile.GetPropertyValue(Customer.ro_AffiliateCookieName).ToString()), HttpContext.Current.Profile.GetPropertyValue(Customer.ro_AffiliateCookieName).ToString(), "0"));
@@ -413,7 +414,8 @@ namespace AspDotNetStorefront
                     ExecutePanel.Visible = true;
                     pnlChangePwd.Visible = false;
 
-                    AppLogic.ExecuteSigninLogic(ThisCustomer.CustomerID, c.CustomerID);
+					AppLogic.ExecuteSigninLogic(ThisCustomer.CustomerID, c.CustomerID);
+					ThisCustomer.ThisCustomerSession.UpdateCustomerSession(null, null);
 
                     String CustomerGUID = c.CustomerGUID.Replace("{", "").Replace("}", "");
 

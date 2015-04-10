@@ -11,5 +11,5 @@ using System.Reflection;
 [assembly: AssemblyCompany("AspDotNetStorefront.com")]
 [assembly: AssemblyProduct("AspDotNetStorefront Multistore")]
 [assembly: AssemblyCopyright("Copyright © AspDotNetStorefront")]
-[assembly: AssemblyVersion("9.5.0.0")]
-[assembly: AssemblyFileVersion("9.5.0.0")]
+[assembly: AssemblyVersion("9.5.1.0")]
+[assembly: AssemblyFileVersion("9.5.1.0")]

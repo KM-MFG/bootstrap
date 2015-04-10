@@ -89,19 +89,10 @@ namespace AspDotNetStorefront
 
                 String ReceiptURL = "receipt.aspx?ordernumber=" + OrderNumber.ToString() + "&customerid=" + CustomerID.ToString();
 
-                bool orderexists;
-                using (SqlConnection conn = DB.dbConn())
-                {
-                    conn.Open();
-                    using (IDataReader rs = DB.GetRS("select * from dbo.orders where customerid=" + CustomerID.ToString() + " and ordernumber=" + OrderNumber.ToString(), conn))
-                    {
-                        orderexists = rs.Read();
-                    }
-                }
+				bool orderexists = DB.GetSqlN(String.Format("select count(ordernumber) N from dbo.orders where customerid={0} and ordernumber={1}", CustomerID, OrderNumber)) > 0;
 
                 if (orderexists)
                 {
-
                     String PM = AppLogic.CleanPaymentMethod(ord.PaymentMethod);
                     String StoreName = AppLogic.AppConfig("StoreName");
                     bool UseLiveTransactions = AppLogic.AppConfigBool("UseLiveTransactions");

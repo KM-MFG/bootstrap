@@ -4,7 +4,7 @@
 	the final filtered, paged, and sorted results are returned from this query.
 
 	This query is designed to wrap an arbitrary SQL query that contains a
-	[Paging.RowIndex] column. That query is injected at the "{0}" token in this
+	[Paging.RowIndex] column. That query is injected at the "{{0}}" token in this
 	file.
 
 	Sorting is performed by the Paging.RowIndex column in the injected query.

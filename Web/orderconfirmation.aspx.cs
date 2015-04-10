@@ -88,19 +88,10 @@ namespace AspDotNetStorefront
 
                 String ReceiptURL = "receipt.aspx?ordernumber=" + OrderNumber.ToString() + "&customerid=" + CustomerID.ToString();
 
-                bool orderexists;
-                using (SqlConnection conn = DB.dbConn())
-                {
-                    conn.Open();
-                    using (IDataReader rs = DB.GetRS("select * from dbo.orders where customerid=" + CustomerID.ToString() + " and ordernumber=" + OrderNumber.ToString(), conn))
-                    {
-                        orderexists = rs.Read();
-                    }
-                }
+				bool orderexists = DB.GetSqlN(String.Format("select count(ordernumber) N from dbo.orders where customerid={0} and ordernumber={1}", CustomerID, OrderNumber)) > 0;
 
                 if (orderexists)
                 {
-
                     String PM = AppLogic.CleanPaymentMethod(ord.PaymentMethod);
                     String StoreName = AppLogic.AppConfig("StoreName");
                     bool UseLiveTransactions = AppLogic.AppConfigBool("UseLiveTransactions");
@@ -172,35 +163,39 @@ namespace AspDotNetStorefront
                         //Google Trusted Stores Order Confirmation module code
                         if (AppLogic.AppConfigBool("GoogleTrustedStoreEnabled") && AppLogic.AppConfig("GoogleTrustedStoreID").Length != 0)
                         {
-                            output.AppendLine("");
                             output.AppendLine("<!-- START Trusted Stores Order --> ");
-                            output.AppendLine("<div id=\"gts-order\" style=\"display:none;\">");
+                            output.AppendLine("<div id=\"gts-order\" style=\"display:none;\" translate=\"no\">");
                             output.AppendLine("<!-- start order and merchant information -->");
-                            output.AppendLine("<span id=\"gts-o-id\">" + OrderNumber.ToString() + "</span>");
-                            output.AppendLine("<span id=\"gts-o-domain\">" + AppLogic.AppConfig("LiveServer") + "</span>");
-                            output.AppendLine("<span id=\"gts-o-email\">" + CommonLogic.IIF(ThisCustomer.EMail.Length > 0, ThisCustomer.EMail, "anonymous@anonymous.com") + "</span>");
-                            output.AppendLine("<span id=\"gts-o-country\">" + "US" + "</span>"); //Hard-coded, Google Trusted Stores is for US only currently.
-                            output.AppendLine("<span id=\"gts-o-currency\">" + "USD" + "</span>"); //Hard-coded, Google Trusted Stores is for USD only currently.
-                            output.AppendLine("<span id=\"gts-o-total\">" + Math.Round(ord.Total(true), 2).ToString() + "</span>");
-                            output.AppendLine("<span id=\"gts-o-discounts\">" + Math.Round((ord.SubTotal(false) - ord.SubTotal(true)), 2).ToString() + "</span>");
-                            output.AppendLine("<span id=\"gts-o-shipping-total\">" + Math.Round(ord.ShippingTotal(true), 2).ToString() + "</span>");
-                            output.AppendLine("<span id=\"gts-o-tax-total\">" + Math.Round(ord.TaxTotal(true), 2).ToString() + "</span>");
-                            output.AppendLine("<span id=\"gts-o-est-ship-date\">" + (System.DateTime.Now.AddDays(AppLogic.AppConfigUSInt("GoogleTrustedStoreShippingLeadTime"))).ToString("yyyy-MM-dd") + "</span>");
-                            output.AppendLine("<span id=\"gts-o-has-preorder\">" + "N" + "</span>"); //Hard-coded for now, backorders/pre-orders not currently supported
-                            output.AppendLine("<span id=\"gts-o-has-digital\">" + CommonLogic.IIF(ord.HasDownloadComponents(false), "Y", "N") + "</span>");
+							output.AppendFormat("<span id=\"gts-o-id\">{0}</span>", OrderNumber);
+							output.AppendFormat("<span id=\"gts-o-domain\">{0}</span>", AppLogic.AppConfig("LiveServer"));
+							output.AppendFormat("<span id=\"gts-o-email\">{0}</span>", ThisCustomer.EMail.Length > 0 
+								? ThisCustomer.EMail 
+								: "anonymous@anonymous.com");
+							output.AppendFormat("<span id=\"gts-o-country\">{0}</span>", AppLogic.GetCountryTwoLetterISOCode(ord.ShippingAddress.m_Country));
+							output.AppendFormat("<span id=\"gts-o-currency\">{0}</span>", AppLogic.AppConfig("Localization.StoreCurrency"));
+							output.AppendFormat("<span id=\"gts-o-total\">{0}</span>", Math.Round(ord.Total(true), 2));
+							output.AppendFormat("<span id=\"gts-o-discounts\">{0}</span>", Math.Round((ord.SubTotal(false) - ord.SubTotal(true)), 2));
+							output.AppendFormat("<span id=\"gts-o-shipping-total\">{0}</span>", Math.Round(ord.ShippingTotal(true), 2));
+							output.AppendFormat("<span id=\"gts-o-tax-total\">{0}</span>", Math.Round(ord.TaxTotal(true), 2));
+							output.AppendFormat("<span id=\"gts-o-est-ship-date\">{0}</span>", (System.DateTime.Now.AddDays(AppLogic.AppConfigUSInt("GoogleTrustedStoreShippingLeadTime"))).ToString("yyyy-MM-dd"));
+							output.AppendFormat("<span id=\"gts-o-est-delivery-date\">{0}</span>", (System.DateTime.Now.AddDays(AppLogic.AppConfigUSInt("GoogleTrustedStoreDeliveryLeadTime"))).ToString("yyyy-MM-dd"));
+                            output.AppendLine("<span id=\"gts-o-has-preorder\">N</span>"); //Hard-coded for now, backorders/pre-orders not currently supported
+							output.AppendFormat("<span id=\"gts-o-has-digital\">{0}</span>", ord.HasDownloadComponents(false) 
+								? "Y"
+								: "N");
                             output.AppendLine("<!-- end order and merchant information -->");
                             output.AppendLine("<!-- start repeated item specific information -->");
 
                             foreach (CartItem ci in ord.CartItems)
                             {
                                 output.AppendLine("<span class=\"gts-item\">");
-                                output.AppendLine("<span class=\"gts-i-name\">" + ci.ProductName + "</span>");
-                                output.AppendLine("<span class=\"gts-i-price\">" + Math.Round(ci.Price, 2).ToString() + "</span>");
-                                output.AppendLine("<span class=\"gts-i-quantity\">" + ci.Quantity + "</span>");
-                                output.AppendLine("<span class=\"gts-i-prodsearch-id\">" + ci.ProductID.ToString() + "-" + ci.VariantID.ToString() + "-" + AppLogic.CleanSizeColorOption(ci.ChosenSize) + "-" + AppLogic.CleanSizeColorOption(ci.ChosenColor) + "</span>");
-                                output.AppendLine("<span class=\"gts-i-prodsearch-store-id\">" + AppLogic.AppConfig("GoogleTrustedStoreProductSearchID") + "</span>");
-                                output.AppendLine("<span class=\"gts-i-prodsearch-country\">" + AppLogic.AppConfig("GoogleTrustedStoreCountry") + "</span>");
-                                output.AppendLine("<span class=\"gts-i-prodsearch-language\">" + AppLogic.AppConfig("GoogleTrustedStoreLanguage") + "</span>");
+								output.AppendFormat("<span class=\"gts-i-name\">{0}</span>", ci.ProductName);
+								output.AppendFormat("<span class=\"gts-i-price\">{0}</span>", Math.Round(ci.Price, 2));
+								output.AppendFormat("<span class=\"gts-i-quantity\">{0}</span>", ci.Quantity);
+								output.AppendFormat("<span class=\"gts-i-prodsearch-id\">{0}-{1}-{2}-{3}</span>", ci.ProductID, ci.VariantID, AppLogic.CleanSizeColorOption(ci.ChosenSize), AppLogic.CleanSizeColorOption(ci.ChosenColor));
+								output.AppendFormat("<span class=\"gts-i-prodsearch-store-id\">{0}</span>", AppLogic.AppConfig("GoogleTrustedStoreProductSearchID"));
+								output.AppendFormat("<span class=\"gts-i-prodsearch-country\">{0}</span>", AppLogic.AppConfig("GoogleTrustedStoreCountry"));
+								output.AppendFormat("<span class=\"gts-i-prodsearch-language\">{0}</span>", AppLogic.AppConfig("GoogleTrustedStoreLanguage"));
                                 output.AppendLine("</span>");
                             }
 
