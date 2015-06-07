@@ -1,0 +1,16 @@
+web.config
+Images
+_km_Assets
+*.diff
+*.psd
+*.ai
+*.eps
+.sass-cache
+*.dmg
+*.exe
+.DS_Store
+._.DS_Store
+Thumbs.db
+._.gitignore
+._.*
+------------

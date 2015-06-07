@@ -1,0 +1,51 @@
+﻿<%@ Master Language="C#" AutoEventWireup="true" Inherits="AspDotNetStorefront.MasterPageBase" %>
+
+<%@ Register TagPrefix="aspdnsf" TagName="Topic" Src="~/Controls/TopicControl.ascx" %>
+<%@ Register TagPrefix="aspdnsfc" Namespace="AspDotNetStorefrontControls" Assembly="AspDotNetStorefrontControls" %>
+<%@ Register TagPrefix="aspdnsf" TagName="XmlPackage" Src="~/Controls/XmlPackageControl.ascx" %>
+<%@ Register TagPrefix="aspdnsf" TagName="Login" Src="~/Controls/Signin.ascx" %>
+
+<%@ Import Namespace="AspDotNetStorefrontCore" %>
+
+<!DOCTYPE html PUBLIC "-//WAPFORUM//DTD XHTML Mobile 1.0//EN" "http://www.wapforum.org/DTD/xhtml-mobile10.dtd">
+<html>
+<head id="Head1" runat="server">
+	<meta http-equiv="Content-Type" content="application/xhtml+xml; charset=utf-8" />
+	<meta name="description" content="" />
+	<meta name="keywords" content="" />
+	<meta name="MobileOptimized" content="320" />
+	<meta name="viewport" content="initial-scale=1.0, maximum-scale=1.0, user-scalable=0" />
+
+	<link href="App_Templates/Skin_<asp:Literal runat="server" Text="<%$ Tokens:SKINID%>" />/mobilestyle.css" rel="stylesheet" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="App_Templates/Skin_<asp:Literal runat="server" Text="<%$ Tokens:SKINID%>" />/retina.css" media="only screen and (-webkit-min-device-pixel-ratio: 2)" />
+    <link href="App_Templates/Skin_<asp:Literal runat="server" Text="<%$ Tokens:SKINID%>" />/jQueryMobile/jquery.mobile-1.0.1.min.css" rel="stylesheet" type="text/css" />
+    
+    <script src="App_Templates/Skin_<asp:Literal ID="Literal2" runat="server" Text="<%$ Tokens:SKINID%>" />/jquery.min.js" type="text/javascript"></script>
+    <script src="App_Templates/Skin_<asp:Literal runat="server" Text="<%$ Tokens:SKINID%>" />/jQueryMobile/jquery.mobile-1.0.1.min.js" type="text/javascript"></script>
+    <script type="text/javascript" src="App_Templates/Skin_<asp:Literal runat="server" Text="<%$ Tokens:SKINID%>" />/MPTools.js"></script>
+
+	<script type="text/javascript" src="jscripts/core.js"></script>
+
+	<%--This xmlpackage can be used to add dynamic data to javascripts such as tracking scripts that should run before the closing head tag--%>
+	<aspdnsf:XmlPackage runat="server" PackageName="script.headclose" />
+</head>
+<body style="min-width: 320px;">
+	<%--This xmlpackage can be used to add dynamic data to javascripts such as tracking scripts that should run just after the opening body tag--%>
+	<aspdnsf:XmlPackage runat="server" PackageName="script.bodyopen" />
+
+	<form id="form1" runat="server">
+		<%  if(RequireScriptManager)
+	  { %>
+		<%-- Only render for pages that require ajax --%>
+        <ajaxToolkit:ToolkitScriptManager runat="server" id="scrptMgr" CombineScripts="true" />
+		<% } %>
+
+		<div id="MobilePage" data-role="page" data-theme='<asp:Literal runat="server" Text="<%$ Tokens:AppConfig, Mobile.ThemeId %>" />'>
+			<aspdnsf:Topic runat="server" TopicName="Template.MaintenancePage" />
+		</div>
+
+		<%--This xmlpackage can be used to add dynamic data to javascripts such as tracking scripts that should run before the closing body tag--%>
+		<aspdnsf:XmlPackage runat="server" PackageName="script.bodyclose" />
+	</form>
+</body>
+</html>
