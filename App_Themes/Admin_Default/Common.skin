@@ -1,3 +1,4 @@
+<%@ Register Assembly="Telerik.Web.UI" Namespace="Telerik.Web.UI" TagPrefix="telerik" %>
 <%--
 Default skin template. The following skins are provided as examples only.
 
@@ -44,3 +45,17 @@ Default skin template. The following skins are provided as examples only.
 	<PagerStyle CssClass="gridPager" />
 	<EditRowStyle CssClass="grid-view-edit" />
 </asp:GridView>
+
+<telerik:RadEditor runat="server" 
+	SkinID="RadEditorSettings"
+	ContentFilters="FixUlBoldItalic,FixEnclosingP,IECleanAnchors,MozEmStrong,ConvertFontToSpan,ConvertToXhtml,IndentHTMLContent,EncodeScripts,OptimizeSpans">
+	<ImageManager UploadPaths="~/Images" ViewPaths="~/Images" DeletePaths="~/Images" />
+	<DocumentManager UploadPaths="~/Images" ViewPaths="~/Images" DeletePaths="~/Images" />
+	<FlashManager UploadPaths="~/Images" ViewPaths="~/Images" DeletePaths="~/Images" />
+	<MediaManager UploadPaths="~/Images" ViewPaths="~/Images" DeletePaths="~/Images" />
+	<SilverlightManager UploadPaths="~/Images" ViewPaths="~/Images" DeletePaths="~/Images" />
+	<TemplateManager UploadPaths="~/Images" ViewPaths="~/Images" DeletePaths="~/Images" />
+	<Modules>
+		<telerik:EditorModule Name="RadEditorToolZone" Enabled="false" Visible="false" />
+	</Modules>
+</telerik:RadEditor>

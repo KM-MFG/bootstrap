@@ -458,7 +458,7 @@ namespace AspDotNetStorefront
             using (SqlConnection conn = DB.dbConn())
             {
                 conn.Open();
-                using (IDataReader rs = DB.GetRS("Select * from orders   with (NOLOCK)  where ordernumber=" + ONX.ToString(), conn))
+				using(IDataReader rs = DB.GetRS(String.Format("Select PaymentMethod, CapturedOn, TransactionState from orders with (NOLOCK) where ordernumber = {0}", ONX), conn))
                 {
                     if (rs.Read())
                     {

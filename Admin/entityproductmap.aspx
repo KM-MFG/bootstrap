@@ -65,7 +65,8 @@
 				Product.Deleted = 0
 				and (@ShowUnmapped = 1 or ProductEntity.EntityID is not null)
 				and {1}"
-		SortExpression="coalesce(SelectedLocalization.LocalizedName, DefaultLocalization.Localizedname, UnspecifiedLocalization.LocalizedName)">
+		SortExpression="coalesce(SelectedLocalization.LocalizedName, DefaultLocalization.Localizedname, UnspecifiedLocalization.LocalizedName)"
+		LocaleSelectionEnabled="true">
 
 		<SqlParameters>
 			<asp:QueryStringParameter Name="entityType" QueryStringField="entityType" />

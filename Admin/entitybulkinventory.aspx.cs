@@ -4,61 +4,62 @@
 // For details on this license please visit the product homepage at the URL above.
 // THE ABOVE NOTICE MUST REMAIN INTACT. 
 // --------------------------------------------------------------------------------
-using AspDotNetStorefrontCore;
 using System;
 using System.Data;
 using System.Globalization;
 using System.Text;
+using AspDotNetStorefrontControls;
+using AspDotNetStorefrontCore;
 
 namespace AspDotNetStorefrontAdmin
 {
-	/// <summary>
-	/// Summary description for bulkeditinventory.
-	/// </summary>
 	public partial class entityBulkInventory : AdminPageBase
 	{
-		int EntityID;
+		int EntityId;
 		String EntityName;
-		EntitySpecs m_EntitySpecs;
+		EntitySpecs EntitySpecs;
 		EntityHelper Helper;
 		new int SkinID = 1;
-		private Customer cust;
+		Locale SelectedLocale;
+		readonly LocaleSource LocaleSource;
+
+		public entityBulkInventory()
+		{
+			LocaleSource = new LocaleSource();
+		}
 
 		protected void Page_Load(object sender, System.EventArgs e)
 		{
-			Response.CacheControl = "private";
-			Response.Expires = 0;
-			Response.AddHeader("pragma", "no-cache");
-
-			cust = ((AspDotNetStorefrontPrincipal)Context.User).ThisCustomer;
-
-			EntityID = CommonLogic.QueryStringUSInt("EntityID"); ;
+			EntityId = CommonLogic.QueryStringUSInt("EntityID"); ;
 			EntityName = CommonLogic.QueryStringCanBeDangerousContent("EntityName");
-			m_EntitySpecs = EntityDefinitions.LookupSpecs(EntityName);
-			Helper = new EntityHelper(m_EntitySpecs, 0);
+			EntitySpecs = EntityDefinitions.LookupSpecs(EntityName);
+			Helper = new EntityHelper(EntitySpecs, 0);
 
-			if (EntityID == 0 || EntityName.Length == 0)
+			if (EntityId == 0 || EntityName.Length == 0)
 			{
 				AlertMessageDisplay.PushAlertMessage(AppLogic.GetString("admin.common.InvalidParameters", SkinID, LocaleSetting), AspDotNetStorefrontControls.AlertMessage.AlertType.Error);
 				MainBody.Visible = false;
 				return;
 			}
 
-			LoadBody();
+			SelectedLocale = LocaleSource.GetDefaultLocale();
+
+			LoadBody(SelectedLocale.Name);
 		}
 
-		protected void LoadBody()
+		protected void LoadBody(string locale)
 		{
-			StringBuilder tmpS = new StringBuilder(4096);
+			var tmpS = new StringBuilder(4096);
 
-			Int32 mappingCount = DB.GetSqlN("select count(*) as N from Product" + this.m_EntitySpecs.m_EntityName + " where " + m_EntitySpecs.m_EntityName + "Id = " + this.EntityID.ToString());
+			var mappingCount = DB.GetSqlN("select count(*) as N from Product" + this.EntitySpecs.m_EntityName + " where " + EntitySpecs.m_EntityName + "Id = " + this.EntityId.ToString());
 
-			ProductCollection products = new ProductCollection(EntityName, EntityID);
+			var products = new ProductCollection(EntityName, EntityId);
 			products.PageSize = 0;
 			products.PageNum = 1;
 			products.PublishedOnly = false;
 			products.ReturnAllVariants = true;
-			DataSet dsProducts = new DataSet();
+
+			var dsProducts = new DataSet();
 			if (mappingCount > 0)
 				dsProducts = products.LoadFromDB();
 
@@ -82,12 +83,12 @@ namespace AspDotNetStorefrontAdmin
 
 				int rowcount = dsProducts.Tables[0].Rows.Count;
 
-				for (int i = 0; i < rowcount; i++)
+				for (var i = 0; i < rowcount; i++)
 				{
-					DataRow row = dsProducts.Tables[0].Rows[i];
+					var row = dsProducts.Tables[0].Rows[i];
 
-					int ThisProductID = DB.RowFieldInt(row, "ProductID");
-					int ThisVariantID = DB.RowFieldInt(row, "VariantID");
+					var ThisProductID = DB.RowFieldInt(row, "ProductID");
+					var ThisVariantID = DB.RowFieldInt(row, "VariantID");
 
 					if (i % 2 == 0)
 					{
@@ -104,61 +105,68 @@ namespace AspDotNetStorefrontAdmin
 					tmpS.Append(ThisVariantID.ToString());
 					tmpS.Append("</td>");
 					tmpS.Append("<td>");
+					
 					bool showlinks = false;
 					if (showlinks)
-						tmpS.Append("<a target=\"entityBody\" href=\"" + AppLogic.AdminLinkUrl("product.aspx") + "?productid=" + ThisProductID.ToString() + "&entityname=" + EntityName + "&entityid=" + EntityID.ToString() + "\">");
-					tmpS.Append(DB.RowFieldByLocale(row, "Name", cust.LocaleSetting));
+						tmpS.Append("<a target=\"entityBody\" href=\"" + AppLogic.AdminLinkUrl("product.aspx") + "?productid=" + ThisProductID.ToString() + "&entityname=" + EntityName + "&entityid=" + EntityId.ToString() + "\">");
+
+					tmpS.Append(DB.RowFieldByLocale(row, "Name", locale));
+					
 					if (showlinks)
 						tmpS.Append("</a>");
+					
 					tmpS.Append("</td>\n");
 					tmpS.Append("<td>");
+					
 					if (showlinks)
-						tmpS.Append("<a target=\"entityBody\" href=\"" + AppLogic.AdminLinkUrl("variant.aspx") + "?productid=" + ThisProductID.ToString() + "&variantid=" + ThisVariantID.ToString() + "&entityname=" + EntityName + "&entityid=" + EntityID.ToString() + "\">");
-					tmpS.Append(DB.RowFieldByLocale(row, "VariantName", cust.LocaleSetting));
+						tmpS.Append("<a target=\"entityBody\" href=\"" + AppLogic.AdminLinkUrl("variant.aspx") + "?productid=" + ThisProductID.ToString() + "&variantid=" + ThisVariantID.ToString() + "&entityname=" + EntityName + "&entityid=" + EntityId.ToString() + "\">");
+
+					tmpS.Append(DB.RowFieldByLocale(row, "VariantName", locale));
+					
 					if (showlinks)
 						tmpS.Append("</a>");
+					
 					tmpS.Append("</td>\n");
 					tmpS.Append("<td>");
-					String s = AppLogic.GetInventoryTable(ThisProductID, ThisVariantID, true, SkinID, false, true);
-					tmpS.Append(s);
+					
+					var inventoryTable = AppLogic.GetInventoryTable(ThisProductID, ThisVariantID, true, SkinID, false, true);
+					tmpS.Append(inventoryTable);
 					tmpS.Append("</td>\n");
 					tmpS.Append("</tr>\n");
 
 				}
 				tmpS.Append("</table>\n");
-
 			}
 			else
 			{
 				MainBody.Visible = false;
 				AlertMessageDisplay.PushAlertMessage(AppLogic.GetString("admin.common.NoProductsFound", SkinID, LocaleSetting), AspDotNetStorefrontControls.AlertMessage.AlertType.Error);
 			}
+
 			dsProducts.Dispose();
 			products.Dispose();
 
 			ltBody.Text = tmpS.ToString();
 		}
 
-		protected void BtnInventoryUpdate_click(object sender, EventArgs e)
+		protected void btnSubmit_Click(object sender, EventArgs e)
 		{
-			for (int i = 0; i <= Request.Form.Count - 1; i++)
+			for (var i = 0; i <= Request.Form.Count - 1; i++)
 			{
-				String FieldName = Request.Form.Keys[i];
+				var FieldName = Request.Form.Keys[i];
 				if (FieldName.IndexOf("|") != -1 && ((FieldName.StartsWith("simple", StringComparison.InvariantCultureIgnoreCase) || FieldName.StartsWith("sizecolor", StringComparison.InvariantCultureIgnoreCase))))
 				{
-					String KeyVal = CommonLogic.FormCanBeDangerousContent(FieldName);
-					// this field should be processed
-					String[] FieldNameSplit = FieldName.Split('|');
-					String InventoryType = FieldNameSplit[0].ToLower(CultureInfo.InvariantCulture);
-					int TheProductID = Localization.ParseUSInt(FieldNameSplit[1]);
-					int TheVariantID = Localization.ParseUSInt(FieldNameSplit[2]);
-					String Size = FieldNameSplit[3];
-					String Color = FieldNameSplit[4];
-					int inputVal = CommonLogic.FormUSInt(FieldName);
+					var KeyVal = CommonLogic.FormCanBeDangerousContent(FieldName);
+					var FieldNameSplit = FieldName.Split('|');
+					var InventoryType = FieldNameSplit[0].ToLower(CultureInfo.InvariantCulture);
+					var TheProductID = Localization.ParseUSInt(FieldNameSplit[1]);
+					var TheVariantID = Localization.ParseUSInt(FieldNameSplit[2]);
+					var Size = FieldNameSplit[3];
+					var Color = FieldNameSplit[4];
+					var inputVal = CommonLogic.FormUSInt(FieldName);
+					
 					if (InventoryType == "simple")
-					{
 						DB.ExecuteSQL("update ProductVariant set Inventory=" + inputVal.ToString() + " where VariantID=" + TheVariantID.ToString());
-					}
 					else
 					{
 						String sql = "select count(*) as N from Inventory  with (NOLOCK)  where VariantID=" + TheVariantID.ToString() + " and lower([size])=" + DB.SQuote(AppLogic.CleanSizeColorOption(Size).ToLowerInvariant()) + " and lower(color)=" + DB.SQuote(AppLogic.CleanSizeColorOption(Color).ToLowerInvariant());
@@ -175,12 +183,13 @@ namespace AspDotNetStorefrontAdmin
 					}
 				}
 			}
+
 			DB.ExecuteSQL("Update Inventory set Quan=0 where Quan<0"); // safety check
 			DB.ExecuteSQL("Update ProductVariant set Inventory=0 where Inventory<0"); // safety check
 
 			AlertMessageDisplay.PushAlertMessage("Inventory was updated", AspDotNetStorefrontControls.AlertMessage.AlertType.Success);
 
-			LoadBody();
+			LoadBody(SelectedLocale.Name);
 		}
 	}
 }

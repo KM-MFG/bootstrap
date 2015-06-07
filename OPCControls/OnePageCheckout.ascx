@@ -221,6 +221,9 @@
 
                 // set focus to the first input element
                 setFirstInputFocus();
+
+            	// update the session timer so each step in OPC starts it over
+                sessionTimer.refresh(false);
             });
         </script>
     </ContentTemplate>

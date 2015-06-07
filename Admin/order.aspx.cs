@@ -271,8 +271,8 @@ namespace AspDotNetStorefrontAdmin
 
 			//Notes
 			txtFinalizationData.Text = CurrentOrder.FinalizationData;
-			txtOrderNotes.Text = Server.HtmlEncode(CurrentOrder.OrderNotes);
-			txtAdminNotes.Text = Server.HtmlEncode(GetOrderStringField(OrderNumber, "Notes"));
+			txtOrderNotes.Text = CurrentOrder.OrderNotes;
+			txtAdminNotes.Text = GetOrderStringField(OrderNumber, "Notes");
 			txtCustomerServiceNotes.Text = CurrentOrder.CustomerServiceNotes;
 			litCustomerServiceVisible.Text = String.Format("{0} {1} {2})",
 				AppLogic.AppConfigBool("ShowCustomerServiceNotesInReceipts") ? AppLogic.GetString("admin.common.yes", ThisCustomer.LocaleSetting) : AppLogic.GetString("admin.common.no", ThisCustomer.LocaleSetting),
@@ -413,7 +413,12 @@ namespace AspDotNetStorefrontAdmin
 			btnReceiptEmail.OnClientClick = String.Format("return confirm('{0}');", AppLogic.GetString("admin.orderframe.QuerySendReceiptEmail", ThisCustomer.LocaleSetting));
 			btnChangeEmail.OnClientClick = String.Format("return confirm('{0}');", AppLogic.GetString("admin.orderframe.QueryChange", ThisCustomer.LocaleSetting));
 			btnAdjustOrderWeight.OnClientClick = String.Format("return confirm('{0}');", AppLogic.GetString("admin.orderframe.QueryChange", ThisCustomer.LocaleSetting));
-			btnCancel.OnClientClick = String.Format("return confirm('{0}');", AppLogic.GetString("admin.orderframe.QueryMark", ThisCustomer.LocaleSetting));
+			btnCancel.OnClientClick = String.Format(@"
+if (
+	$('#ddlCancelActions').val() === 'MarkAsFraud'
+	|| $('#ddlCancelActions').val() === 'ClearFraud'
+) 
+return confirm('{0}');", AppLogic.GetString("admin.orderframe.QueryMark", ThisCustomer.LocaleSetting));
 			btnEdit.OnClientClick = String.Format("return confirm('{0}');", AppLogic.GetString("admin.orderframe.QueryEdit", ThisCustomer.LocaleSetting));
 		}
 
@@ -842,8 +847,8 @@ namespace AspDotNetStorefrontAdmin
 					}
 				case "ForceRefund":
 					{
-						Gateway.OrderManagement_DoForceFullRefund(CurrentOrder, ThisCustomer.LocaleSetting);
-						return;
+						script.Append(String.Format("window.open('refundorder.aspx?ordernumber={0}&force=true','toolbar=no,location=no,directories=no,status=no,menubar=no,scrollbars=yes,resizable=yes,copyhistory=no,width=600,height=500,left=0,top=0');\n", OrderNumber));
+						break;
 					}
 				case "MarkAsFraud":
 					{

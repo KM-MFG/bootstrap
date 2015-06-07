@@ -24,9 +24,9 @@
 
 		<div class="item-action-bar clearfix">
 			<div class="other-actions">
-				<asp:Panel ID="pnlLocale" runat="server">
-					<asp:Label runat="server" Text="<%$Tokens:StringResource, admin.stringresources.Locale %>" AssociatedControlID="ddLocale" />
-					<asp:DropDownList ID="ddLocale" runat="server" AutoPostBack="true" OnSelectedIndexChanged="ddLocale_SelectedIndexChanged" />
+				<asp:Panel ID="pnlLocale" runat="server" Visible='<%# LocaleSelector.HasMultipleLocales() %>'>
+					<asp:Label runat="server" Text="<%$Tokens:StringResource, admin.stringresources.Locale %>" AssociatedControlID="LocaleSelector" />
+					<aspdnsf:LocaleSelector ID="LocaleSelector" runat="server" OnSelectedLocaleChanged="LocaleSelector_SelectedLocaleChanged" />
 				</asp:Panel>
 			</div>
 
@@ -318,18 +318,10 @@
 						<table class="table table-detail">
 							<tr>
 								<td>
-									<asp:Literal ID="ltSummary" runat="Server"></asp:Literal>
-									<telerik:RadEditor runat="server" ID="radSummary">
-										<ImageManager UploadPaths="~/Images" ViewPaths="~/Images" DeletePaths="~/Images" />
-										<DocumentManager UploadPaths="~/Images" ViewPaths="~/Images" DeletePaths="~/Images" />
-										<FlashManager UploadPaths="~/Images" ViewPaths="~/Images" DeletePaths="~/Images" />
-										<MediaManager UploadPaths="~/Images" ViewPaths="~/Images" DeletePaths="~/Images" />
-										<SilverlightManager UploadPaths="~/Images" ViewPaths="~/Images" DeletePaths="~/Images" />
-										<TemplateManager UploadPaths="~/Images" ViewPaths="~/Images" DeletePaths="~/Images" />
-										<Modules>
-											<telerik:EditorModule Name="RadEditorToolZone" Enabled="false" Visible="false" />
-										</Modules>
-									</telerik:RadEditor>
+									<div class="form-group">
+										<asp:TextBox ID="txtSummaryNoHtmlEditor" Rows="15" TextMode="MultiLine" runat="server" Visible="false" CssClass="form-control" />
+									</div>
+									<telerik:RadEditor runat="server" ID="radSummary" SkinID="RadEditorSettings" />
 								</td>
 							</tr>
 						</table>
@@ -340,18 +332,10 @@
 						<table class="table table-detail">
 							<tr>
 								<td>
-									<asp:Literal ID="ltDescription" runat="Server"></asp:Literal>
-									<telerik:RadEditor runat="server" ID="radDescription">
-										<ImageManager UploadPaths="~/Images" ViewPaths="~/Images" DeletePaths="~/Images" />
-										<DocumentManager UploadPaths="~/Images" ViewPaths="~/Images" DeletePaths="~/Images" />
-										<FlashManager UploadPaths="~/Images" ViewPaths="~/Images" DeletePaths="~/Images" />
-										<MediaManager UploadPaths="~/Images" ViewPaths="~/Images" DeletePaths="~/Images" />
-										<SilverlightManager UploadPaths="~/Images" ViewPaths="~/Images" DeletePaths="~/Images" />
-										<TemplateManager UploadPaths="~/Images" ViewPaths="~/Images" DeletePaths="~/Images" />
-										<Modules>
-											<telerik:EditorModule Name="RadEditorToolZone" Enabled="false" Visible="false" />
-										</Modules>
-									</telerik:RadEditor>
+									<div class="form-group">
+										<asp:TextBox ID="txtDescriptionNoHtmlEditor" Rows="15" TextMode="MultiLine" runat="server" Visible="false" CssClass="form-control" />
+									</div>
+									<telerik:RadEditor runat="server" ID="radDescription" SkinID="RadEditorSettings" />
 								</td>
 							</tr>
 						</table>
@@ -368,9 +352,7 @@
 							<tr>
 								<td>
 									<div class="form-group">
-										<div class="col-sm-6">
-											<asp:TextBox class="form-control multiExtension" Rows="0" Columns="0" ID="txtExtensionData" runat="Server" TextMode="multiLine"></asp:TextBox>
-										</div>
+										<asp:TextBox class="form-control multiExtension" Rows="0" Columns="0" ID="txtExtensionData" runat="Server" TextMode="multiLine"></asp:TextBox>
 									</div>
 								</td>
 							</tr>

@@ -10,8 +10,10 @@ using System.Data;
 using System.Data.SqlClient;
 using System.Drawing;
 using System.IO;
+using System.Web.UI.HtmlControls;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Web;
 using System.Web.UI.WebControls;
 using AspDotNetStorefrontControls;
@@ -50,10 +52,8 @@ namespace AspDotNetStorefrontAdmin
 				ctrlAlertMessage.PushAlertMessage("Maximum number of allowed entities exceeded. To add additional entities, please delete some entities or upgrade to AspDotNetStoreFront ML", AlertMessage.AlertType.Error);
 
 			// Determine HTML editor configuration
-			radSummary.Visible = UseHtmlEditor;
-			radDescription.Visible = UseHtmlEditor;
-			radDescription.DisableFilter(Telerik.Web.UI.EditorFilters.RemoveScripts);
-			radSummary.DisableFilter(Telerik.Web.UI.EditorFilters.RemoveScripts);
+			radSummary.Visible = radDescription.Visible = UseHtmlEditor;
+			txtDescriptionNoHtmlEditor.Visible = txtSummaryNoHtmlEditor.Visible = !UseHtmlEditor;
 
 			Tr2.Visible = AppLogic.AppConfigBool("TemplateSwitching.Enabled");
 
@@ -69,20 +69,7 @@ namespace AspDotNetStorefrontAdmin
 					etsMapper.Visible = false;
 					pnlStoreMapNotSupported.Visible = true;
 				}
-
-				if(ThisCustomer.ThisCustomerSession.Session("entityUserLocale").Length == 0)
-					ThisCustomer.ThisCustomerSession.SetVal("entityUserLocale", Localization.GetDefaultLocale());
-
-				ddLocale.Items.Clear();
-
-				using(DataTable dtLocale = Localization.GetLocales())
-					foreach(DataRow dr in dtLocale.Rows)
-						ddLocale.Items.Add(new ListItem(DB.RowField(dr, "Description"), DB.RowField(dr, "Name")));
-
-				if(ddLocale.Items.Count < 2)
-					pnlLocale.Visible = false;
-
-				ddLocale.SelectedValue = Localization.GetDefaultLocale();
+				
 				LoadContent();
 				liProductsTab.Visible = EntityId > 0;
 			}
@@ -90,6 +77,7 @@ namespace AspDotNetStorefrontAdmin
 
 		protected override void OnPreRender(EventArgs e)
 		{
+			DataBind();
 			CancelLinkTop.DataBind();
 			CancelLinkBottom.DataBind();
 			ProductMappingLink.DataBind();
@@ -100,12 +88,12 @@ namespace AspDotNetStorefrontAdmin
 			base.OnPreRender(e);
 		}
 
-		protected void ddLocale_SelectedIndexChanged(Object sender, EventArgs e)
+		protected void LocaleSelector_SelectedLocaleChanged(Object sender, EventArgs e)
 		{
-			if(ddLocale.SelectedValue != String.Empty)
-				ThisCustomer.ThisCustomerSession.SetVal("entityUserLocale", ddLocale.SelectedValue);
-			else
-				ThisCustomer.ThisCustomerSession.SetVal("entityUserLocale", Localization.GetDefaultLocale());
+			bulkFrame.Attributes["src"] = Regex.Replace(
+				input: bulkFrame.Attributes["src"],
+				pattern: "&locale\\.selection=[a-z]{2}-[A-Z]{2}",
+				replacement: string.Format("&locale.selection={0}", LocaleSelector.GetSelectedLocale().Name));
 
 			LoadContent();
 		}
@@ -125,32 +113,41 @@ namespace AspDotNetStorefrontAdmin
 
 		protected void lnkBulkDisplayOrder_Click(Object sender, EventArgs e)
 		{
-			bulkFrame.Attributes.Add("src", String.Format("entityproductbulkdisplayorder.aspx?EntityName={0}&EntityId={1}", EntityName, EntityId));
+			SetBulkFrameSource("entityproductbulkdisplayorder.aspx");
 		}
 
 		protected void lnkBulkInventory_Click(Object sender, EventArgs e)
 		{
-			bulkFrame.Attributes.Add("src", String.Format("entitybulkinventory.aspx?EntityName={0}&EntityId={1}", EntityName, EntityId));
+			SetBulkFrameSource("entitybulkinventory.aspx");
 		}
 
 		protected void lnkBulkSEFields_Click(Object sender, EventArgs e)
 		{
-			bulkFrame.Attributes.Add("src", String.Format("entitybulkse.aspx?EntityName={0}&EntityId={1}", EntityName, EntityId));
+			SetBulkFrameSource("entitybulkse.aspx");
 		}
 
 		protected void lnkBulkPrices_Click(Object sender, EventArgs e)
 		{
-			bulkFrame.Attributes.Add("src", String.Format("entitybulkprices.aspx?EntityName={0}&EntityId={1}", EntityName, EntityId));
+			SetBulkFrameSource("entitybulkprices.aspx");
 		}
 
 		protected void lnkBulkShippingMethods_Click(Object sender, EventArgs e)
 		{
-			bulkFrame.Attributes.Add("src", String.Format("entitybulkshipping.aspx?EntityName={0}&EntityId={1}", EntityName, EntityId));
+			SetBulkFrameSource("entitybulkshipping.aspx");
 		}
 
 		protected void lnkBulkDownloadFiles_Click(Object sender, EventArgs e)
 		{
-			bulkFrame.Attributes.Add("src", String.Format("entitybulkdownloadfiles.aspx?EntityName={0}&EntityId={1}", EntityName, EntityId));
+			SetBulkFrameSource("entitybulkdownloadfiles.aspx");
+		}
+
+		void SetBulkFrameSource(string page)
+		{
+			var locale = LocaleSelector
+				.GetSelectedLocale()
+				.Name;
+
+			bulkFrame.Attributes.Add("src", String.Format("{0}?EntityName={1}&EntityId={2}&locale.selection={3}", page, EntityName, EntityId, locale));
 		}
 
 		void LoadContent()
@@ -159,16 +156,11 @@ namespace AspDotNetStorefrontAdmin
 			ddParent.Items.Clear();
 			ddState.Items.Clear();
 
-			//pull locale from user session
-			var entityLocale = ThisCustomer.ThisCustomerSession.Session("entityUserLocale");
-			if(entityLocale.Length > 0)
-				ddLocale.SelectFirstByValue(entityLocale);
-
 			var skinId = 1;
 
-			var locale = Localization.CheckLocaleSettingForProperCase(ddLocale.SelectedValue);
-			if(ddLocale.SelectedValue == String.Empty)
-				locale = Localization.GetDefaultLocale();
+			var locale = LocaleSelector
+				.GetSelectedLocale()
+				.Name;
 
 			using(var connection = new SqlConnection(DB.GetDBConn()))
 			{
@@ -215,11 +207,11 @@ namespace AspDotNetStorefrontAdmin
 
 						using(var innerConnection = new SqlConnection(DB.GetDBConn()))
 						{
-                            innerConnection.Open();
+							innerConnection.Open();
 
 							using(var reader = DB.GetRS("select * from state   with (NOLOCK)  order by DisplayOrder,Name", innerConnection))
 								while(reader.Read())
-									ddState.Items.Add(new ListItem(Security.HtmlEncode(DB.RSField(reader, "Name")), Security.HtmlEncode(DB.RSField(reader, "Abbreviation"))));
+									ddState.Items.Add(new ListItem(DB.RSField(reader, "Name"), DB.RSField(reader, "Abbreviation")));
 
 							using(var reader = DB.GetRS("select * from country with (NOLOCK) order by DisplayOrder,Name", innerConnection))
 								while(reader.Read())
@@ -274,19 +266,19 @@ namespace AspDotNetStorefrontAdmin
 						if(EntitySpecs.m_HasAddress)
 						{
 							txtAddress1.Text = EntityEditing
-								? Security.HtmlEncode(DB.RSField(entityReader, "Address1"))
+								? DB.RSField(entityReader, "Address1")
 								: String.Empty;
 
 							txtApt.Text = EntityEditing
-								? Security.HtmlEncode(DB.RSField(entityReader, "Suite"))
+								? DB.RSField(entityReader, "Suite")
 								: String.Empty;
 
 							txtAddress2.Text = EntityEditing
-								? Security.HtmlEncode(DB.RSField(entityReader, "Address2"))
+								? DB.RSField(entityReader, "Address2")
 								: String.Empty;
 
 							txtCity.Text = EntityEditing
-								? Security.HtmlEncode(DB.RSField(entityReader, "City"))
+								? DB.RSField(entityReader, "City")
 								: String.Empty;
 
 							ddState.SelectFirstByValue(DB.RSField(entityReader, "State"));
@@ -391,11 +383,7 @@ namespace AspDotNetStorefrontAdmin
 						}
 						else
 						{
-							ltDescription.Text = "<div class=\"form-group\">";
-							ltDescription.Text += "<div class=\"col-sm-6\">";
-							ltDescription.Text += "<textarea id=\"Description\" class=\"form-control multiExtension\" name=\"Description\">" + XmlCommon.GetLocaleEntry(Security.HtmlEncode(DB.RSField(entityReader, "Description")), locale, false) + "</textarea>";
-							ltDescription.Text += "</div>";
-							ltDescription.Text += "</div>";
+							txtDescriptionNoHtmlEditor.Text = XmlCommon.GetLocaleEntry(DB.RSField(entityReader, "Description"), locale, false);
 						}
 
 						if(UseHtmlEditor)
@@ -404,11 +392,7 @@ namespace AspDotNetStorefrontAdmin
 						}
 						else
 						{
-							ltSummary.Text = "<div class=\"form-group\">";
-							ltSummary.Text += "<div class=\"col-sm-6\">";
-							ltSummary.Text += "<textarea id=\"Summary\" class=\"form-control multiExtension\" name=\"Summary\">" + XmlCommon.GetLocaleEntry(Security.HtmlEncode(DB.RSField(entityReader, "Summary")), locale, false) + "</textarea>\n";
-							ltSummary.Text += "</div>";
-							ltSummary.Text += "</div>";
+							txtSummaryNoHtmlEditor.Text = XmlCommon.GetLocaleEntry(DB.RSField(entityReader, "Summary"), locale, false);
 						}
 
 						txtExtensionData.Text = EntityEditing
@@ -460,22 +444,6 @@ namespace AspDotNetStorefrontAdmin
 							ltEntity.Text = "Root Level";
 						}
 
-						if(!UseHtmlEditor)
-						{
-							ltDescription.Text = @"
-								<div class='form-group'>
-									<div class='col-sm-6'>
-										<textarea class='form-control multiExtension' id='Description' name='Description'></textarea>
-									</div>
-								</div>";
-
-							ltSummary.Text = @"
-								<div class='form-group'>
-									<div class='col-sm-6'>
-										<textarea class='form-control multiExtension' id='Summary' name='Summary'></textarea>
-									</div>
-								</div>";
-						}
 
 						txtExtensionData.Text = EntityEditing
 							? DB.RSField(entityReader, "ExtensionData")
@@ -509,9 +477,9 @@ namespace AspDotNetStorefrontAdmin
 			if(parentId == EntityId) // prevent case which causes endless recursion
 				parentId = 0;
 
-			var locale = ddLocale.SelectedValue;
-			if(locale.Equals(String.Empty))
-				locale = Localization.GetDefaultLocale();
+			var locale = LocaleSelector
+				.GetSelectedLocale()
+				.Name;
 
 			try
 			{
@@ -640,8 +608,8 @@ namespace AspDotNetStorefrontAdmin
 					}
 					else
 					{
-						sql.Append(DB.SQuote(AppLogic.FormLocaleXmlEditor("Summary", "Summary", locale, EntitySpecs, EntityId)) + ",");
-						sql.Append(DB.SQuote(AppLogic.FormLocaleXmlEditor("Description", "Description", locale, EntitySpecs, EntityId)) + ",");
+						sql.Append(DB.SQuote(AppLogic.FormLocaleXmlEditor("Summary", txtSummaryNoHtmlEditor.Text.Trim(), locale, EntitySpecs, EntityId)) + ",");
+						sql.Append(DB.SQuote(AppLogic.FormLocaleXmlEditor("Description", txtDescriptionNoHtmlEditor.Text.Trim(), locale, EntitySpecs, EntityId)) + ",");
 					}
 
 					sql.Append(DB.SQuote(txtExtensionData.Text) + ",");
@@ -796,8 +764,8 @@ namespace AspDotNetStorefrontAdmin
 					}
 					else
 					{
-						sql.Append("Summary=" + DB.SQuote(AppLogic.FormLocaleXmlEditor("Summary", "Summary", locale, EntitySpecs, EntityId)) + ",");
-						sql.Append("Description=" + DB.SQuote(AppLogic.FormLocaleXmlEditor("Description", "Description", locale, EntitySpecs, EntityId)) + ",");
+						sql.Append("Summary=" + DB.SQuote(AppLogic.FormLocaleXml("Summary", txtSummaryNoHtmlEditor.Text.Trim(), locale, EntitySpecs, EntityId)) + ",");
+						sql.Append("Description=" + DB.SQuote(AppLogic.FormLocaleXml("Description", txtDescriptionNoHtmlEditor.Text.Trim(), locale, EntitySpecs, EntityId)) + ",");
 					}
 					sql.Append("ExtensionData=" + DB.SQuote(txtExtensionData.Text) + ",");
 

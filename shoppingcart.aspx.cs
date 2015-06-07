@@ -391,7 +391,9 @@ namespace AspDotNetStorefront
 					btnPayPalBillMeLaterBottom.Visible = btnPayPalBillMeLaterTop.Visible;
 					ltBillMeLaterMessageBottom.Visible = btnPayPalBillMeLaterTop.Visible;
 
-					if (ThisCustomer.IsRegistered && AppLogic.AppConfigBool("PayPal.Express.UseIntegratedCheckout") && AppLogic.AppConfig("PayPal.API.Signature").Length > 0)
+					if ((ThisCustomer.IsRegistered || AppLogic.AppConfigBool("PayPal.Express.AllowAnonCheckout"))
+						&& AppLogic.AppConfigBool("PayPal.Express.UseIntegratedCheckout") 
+						&& AppLogic.AppConfig("PayPal.API.Signature").Length > 0)
 					{
 						ltPayPalIntegratedCheckout.Text = AspDotNetStorefrontGateways.Processors.PayPalController.GetExpressCheckoutIntegratedScript(true);
 						btnPayPalExpressCheckoutTop.Attributes.Add("onClick", "return startCheckout();");

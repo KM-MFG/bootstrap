@@ -294,7 +294,7 @@ namespace AspDotNetStorefront
                         }
 
                         AppLogic.ExecuteSigninLogic(CurrentCustomerID, NewCustomerID);
-
+						ThisCustomer.ThisCustomerSession.UpdateCustomerSession(null, null);
 
                         object affiliateIDParameter = null;
 
@@ -574,7 +574,8 @@ namespace AspDotNetStorefront
                         ExecutePanel.Visible = true;
                         pnlChangePwd.Visible = false;
 
-                        AppLogic.ExecuteSigninLogic(CurrentCustomerID, ThisCustomer.CustomerID);
+						AppLogic.ExecuteSigninLogic(CurrentCustomerID, ThisCustomer.CustomerID);
+						ThisCustomer.ThisCustomerSession.UpdateCustomerSession(null, null);
 
                         String CustomerGUID = ThisCustomer.CustomerGUID.Replace("{", "").Replace("}", "");
 

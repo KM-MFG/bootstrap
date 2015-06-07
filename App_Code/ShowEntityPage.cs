@@ -448,7 +448,7 @@ namespace AspDotNetStorefront
                             using (SqlConnection dbconn = new SqlConnection(DB.GetDBConn()))
                             {
                                 dbconn.Open();
-                                using (IDataReader rs = DB.GetRS("select * from productvariant where VariantID=" + VariantID.ToString(), dbconn))
+								using(IDataReader rs = DB.GetRS(String.Format("select Colors, ColorSKUModifiers, Sizes, SizeSKUModifiers from productvariant where VariantID = {0}", VariantID), dbconn))
                                 {
                                     rs.Read();
                                     ChosenColor = DB.RSFieldByLocale(rs, "Colors", Localization.GetDefaultLocale()).Split(',')[ColorIdx].Trim();

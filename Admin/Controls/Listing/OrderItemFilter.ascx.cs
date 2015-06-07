@@ -39,7 +39,7 @@ namespace AspDotNetStorefrontControls.Listing
 
 			return new FilterClause(
 				String.Format(
-					"(@{0} is null or OrderNumber in (select OrderNumber from Orders_ShoppingCart where OrderedProductName like '%' + @{0} + '%' or OrderedProductVariantName like '%' + @{0} + '%' or OrderedProductSku like '%' + @{0} + '%'))",
+					"(@{0} is null or OrderNumber in (select OrderNumber from Orders_ShoppingCart where charindex(@{0}, OrderedProductName) > 0 or charindex(@{0}, OrderedProductVariantName) > 0 or charindex(@{0}, OrderedProductSku) > 0))",
 					selectedValueParameterName),
 				new[] { new ControlParameter(selectedValueParameterName, System.Data.DbType.String, Value.UniqueID, "Text") });
 		}

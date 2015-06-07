@@ -8,148 +8,147 @@ using System;
 using System.Data;
 using System.Data.SqlClient;
 using System.Text;
+using AspDotNetStorefrontControls;
 using AspDotNetStorefrontCore;
 
 namespace AspDotNetStorefrontAdmin
 {
-    /// <summary>
-    /// Summary description for bulkeditshippingcosts.
-    /// </summary>
-    public partial class entityBulkShipping : AdminPageBase
-    {
-        int EntityID;
-        String EntityName;
-        EntitySpecs m_EntitySpecs;
-        EntityHelper Helper;
-        private Customer cust;
+	public partial class entityBulkShipping : AdminPageBase
+	{
+		int EntityId;
+		string EntityName;
+		EntitySpecs EntitySpecs;
+		EntityHelper Helper;
+		Locale SelectedLocale;
+		readonly LocaleSource LocaleSource;
 
-        protected void Page_Load(object sender, System.EventArgs e)
-        {
-            Response.CacheControl = "private";
-            Response.Expires = 0;
-            Response.AddHeader("pragma", "no-cache");
-
-            cust = ((AspDotNetStorefrontPrincipal)Context.User).ThisCustomer;
-
-            EntityID = CommonLogic.QueryStringUSInt("EntityID");
-            EntityName = CommonLogic.QueryStringCanBeDangerousContent("EntityName");
-            m_EntitySpecs = EntityDefinitions.LookupSpecs(EntityName);
-            Helper = new EntityHelper(m_EntitySpecs, 0);
-           
-            if (EntityID == 0 || EntityName.Length == 0)
-            {
-                ltBody.Text = AppLogic.GetString("admin.common.InvalidParameters", SkinID, LocaleSetting);
-                return;
-            }
-            if (CommonLogic.FormCanBeDangerousContent("IsSubmit").Equals("TRUE", StringComparison.InvariantCultureIgnoreCase))
-            {
-                for (int i = 0; i <= Request.Form.Count - 1; i++)
-                {
-                    String FieldName = Request.Form.Keys[i];
-                    if (FieldName.StartsWith("shippingcost", StringComparison.InvariantCultureIgnoreCase) && !FieldName.EndsWith("_vldt", StringComparison.InvariantCultureIgnoreCase))
-                    {
-                        String[] FieldNameSplit = FieldName.Split('_');
-                        int ThisVariantID = Localization.ParseUSInt(FieldNameSplit[1]);
-                        int ThisShippingMethodID = Localization.ParseUSInt(FieldNameSplit[2]);
-                        decimal ShippingCost = CommonLogic.FormUSDecimal(FieldName);
-                        DB.ExecuteSQL("delete from ShippingByProduct where VariantID=" + ThisVariantID.ToString() + " and ShippingMethodID=" + ThisShippingMethodID.ToString());
-                        DB.ExecuteSQL("insert ShippingByProduct(VariantID,ShippingMethodID,ShippingCost) values(" + ThisVariantID.ToString() + "," + ThisShippingMethodID.ToString() + "," + Localization.CurrencyStringForDBWithoutExchangeRate(ShippingCost) + ")");
-                    }
-                }
-				AlertMessageDisplay.PushAlertMessage("The shipping costs have been saved.", AspDotNetStorefrontControls.AlertMessage.AlertType.Success);
-
-            }
-
-            LoadBody();
-        }
-
-		protected void LoadBody()
+		public entityBulkShipping()
 		{
-			StringBuilder tmpS = new StringBuilder(4096);
+			LocaleSource = new LocaleSource();
+		}
 
-			using (ProductCollection products = new ProductCollection(m_EntitySpecs.m_EntityName, EntityID))
+		protected void Page_Load(object sender, System.EventArgs e)
+		{
+			EntityId = CommonLogic.QueryStringUSInt("EntityID");
+			EntityName = CommonLogic.QueryStringCanBeDangerousContent("EntityName");
+			EntitySpecs = EntityDefinitions.LookupSpecs(EntityName);
+			Helper = new EntityHelper(EntitySpecs, 0);
+
+			if(EntityId == 0 || EntityName.Length == 0)
 			{
-				Int32 mappingCount = DB.GetSqlN("select count(*) as N from Product" + this.m_EntitySpecs.m_EntityName + " where " + m_EntitySpecs.m_EntityName + "Id = " + this.EntityID.ToString());
+				ltBody.Text = AppLogic.GetString("admin.common.InvalidParameters", SkinID, LocaleSetting);
+				return;
+			}
+
+			if(CommonLogic.FormCanBeDangerousContent("IsSubmit").Equals("TRUE", StringComparison.InvariantCultureIgnoreCase))
+			{
+				for(var i = 0; i <= Request.Form.Count - 1; i++)
+				{
+					var fieldName = Request.Form.Keys[i];
+					if(fieldName.StartsWith("shippingcost", StringComparison.InvariantCultureIgnoreCase) && !fieldName.EndsWith("_vldt", StringComparison.InvariantCultureIgnoreCase))
+					{
+						var fieldNameSplit = fieldName.Split('_');
+						var variantId = Localization.ParseUSInt(fieldNameSplit[1]);
+						var shippingMethodId = Localization.ParseUSInt(fieldNameSplit[2]);
+						var shippingCost = CommonLogic.FormUSDecimal(fieldName);
+						DB.ExecuteSQL("delete from ShippingByProduct where VariantID=" + variantId.ToString() + " and ShippingMethodID=" + shippingMethodId.ToString());
+						DB.ExecuteSQL("insert ShippingByProduct(VariantID,ShippingMethodID,ShippingCost) values(" + variantId.ToString() + "," + shippingMethodId.ToString() + "," + Localization.CurrencyStringForDBWithoutExchangeRate(shippingCost) + ")");
+					}
+				}
+
+				AlertMessageDisplay.PushAlertMessage("The shipping costs have been saved.", AspDotNetStorefrontControls.AlertMessage.AlertType.Success);
+			}
+
+			SelectedLocale = LocaleSource.GetDefaultLocale();
+
+			LoadBody(SelectedLocale.Name);
+		}
+
+		void LoadBody(string locale)
+		{
+			var body = new StringBuilder(4096);
+
+			using(var products = new ProductCollection(EntitySpecs.m_EntityName, EntityId))
+			{
+				var mappingCount = DB.GetSqlN("select count(*) as N from Product" + this.EntitySpecs.m_EntityName + " where " + EntitySpecs.m_EntityName + "Id = " + this.EntityId.ToString());
 
 				products.PageSize = 0;
 				products.PageNum = 1;
 				products.PublishedOnly = false;
 				products.ReturnAllVariants = true;
 
-				DataSet dsProducts = new DataSet();
-				if (mappingCount > 0)
+				var dsProducts = new DataSet();
+				if(mappingCount > 0)
 					dsProducts = products.LoadFromDB();
-				
-				int NumProducts = products.NumProducts;
-				if (NumProducts > 1000)
+
+				var numberOfProducts = products.NumProducts;
+				if(numberOfProducts > 1000)
 				{
 					AlertMessageDisplay.PushAlertMessage(AppLogic.GetString("admin.common.ImportExcession", SkinID, LocaleSetting), AspDotNetStorefrontControls.AlertMessage.AlertType.Error);
 					MainBody.Visible = false;
 				}
-				else if (NumProducts > 0)
+				else if(numberOfProducts > 0)
 				{
-					using (DataTable dtShippingMethods = new DataTable())
+					using(var dtShippingMethods = new DataTable())
 					{
-						using (SqlConnection con = new SqlConnection(DB.GetDBConn()))
+						using(var connection = new SqlConnection(DB.GetDBConn()))
 						{
-							con.Open();
-							using (IDataReader rs = DB.GetRS("select * from ShippingMethod  with (NOLOCK)  where IsRTShipping=0 order by DisplayOrder", con))
+							connection.Open();
+							using(var rs = DB.GetRS("select * from ShippingMethod  with (NOLOCK)  where IsRTShipping=0 order by DisplayOrder", connection))
 							{
 								dtShippingMethods.Load(rs);
 							}
 						}
 
+						body.Append("<input type=\"hidden\" name=\"IsSubmit\" value=\"true\">\n");
+						body.Append("<table class=\"table\">\n");
+						body.Append("<tr class=\"table-header\">\n");
+						body.Append("<td><b>" + AppLogic.GetString("admin.common.ProductID", SkinID, LocaleSetting) + "</b></td>\n");
+						body.Append("<td><b>" + AppLogic.GetString("admin.common.VariantID", SkinID, LocaleSetting) + "</b></td>\n");
+						body.Append("<td><b>" + AppLogic.GetString("admin.common.ProductName", SkinID, LocaleSetting) + "</b></td>\n");
+						body.Append("<td><b>" + AppLogic.GetString("admin.common.VariantName", SkinID, LocaleSetting) + "</b></td>\n");
+						
+						foreach(DataRow row in dtShippingMethods.Rows)
+							body.Append("<td><b>" + DB.RowFieldByLocale(row, "Name", locale) + " Cost</b><br/>" + AppLogic.GetString("admin.entityBulkPrices.Format", SkinID, LocaleSetting) + "</td>\n");
+						
+						body.Append("</tr>\n");
 
-						tmpS.Append("<input type=\"hidden\" name=\"IsSubmit\" value=\"true\">\n");
-
-						tmpS.Append("<table class=\"table\">\n");
-						tmpS.Append("<tr class=\"table-header\">\n");
-						tmpS.Append("<td><b>" + AppLogic.GetString("admin.common.ProductID", SkinID, LocaleSetting) + "</b></td>\n");
-						tmpS.Append("<td><b>" + AppLogic.GetString("admin.common.VariantID", SkinID, LocaleSetting) + "</b></td>\n");
-						tmpS.Append("<td><b>" + AppLogic.GetString("admin.common.ProductName", SkinID, LocaleSetting) + "</b></td>\n");
-						tmpS.Append("<td><b>" + AppLogic.GetString("admin.common.VariantName", SkinID, LocaleSetting) + "</b></td>\n");
-						foreach (DataRow row in dtShippingMethods.Rows)
+						for(var i = 0; i < dsProducts.Tables[0].Rows.Count; i++)
 						{
-							tmpS.Append("<td><b>" + DB.RowFieldByLocale(row, "Name", cust.LocaleSetting) + " Cost</b><br/>" + AppLogic.GetString("admin.entityBulkPrices.Format", SkinID, LocaleSetting) + "</td>\n");
-						}
-						tmpS.Append("</tr>\n");
+							var row = dsProducts.Tables[0].Rows[i];
+							var productId = DB.RowFieldInt(row, "ProductID");
+							var variantId = DB.RowFieldInt(row, "VariantID");
 
-						for (int i = 0; i < dsProducts.Tables[0].Rows.Count; i++)
-						{
-							DataRow row = dsProducts.Tables[0].Rows[i];
+							body.Append("<tr>\n");
+							body.Append("<td>");
+							body.Append(productId.ToString());
+							body.Append("</td>");
+							body.Append("<td>");
+							body.Append(variantId.ToString());
+							body.Append("</td>");
+							body.Append("<td>");
+							body.Append("<a target=\"entityBody\" href=\"" + AppLogic.AdminLinkUrl("product.aspx") + "?productid=" + productId.ToString() + "&entityname=" + EntityName + "&entityid=" + EntityId.ToString() + "\">");
+							body.Append(DB.RowFieldByLocale(row, "Name", locale));
+							body.Append("</a>");
+							body.Append("</td>\n");
+							body.Append("<td>");
+							body.Append("<a target=\"entityBody\" href=\"" + AppLogic.AdminLinkUrl("variant.aspx") + "?productid=" + productId.ToString() + "&variantid=" + variantId.ToString() + "\">");
+							body.Append(DB.RowFieldByLocale(row, "VariantName", locale));
+							body.Append("</a>");
+							body.Append("</td>\n");
 
-							int ThisProductID = DB.RowFieldInt(row, "ProductID");
-							int ThisVariantID = DB.RowFieldInt(row, "VariantID");
-
-							tmpS.Append("<tr>\n");
-
-							tmpS.Append("<td>");
-							tmpS.Append(ThisProductID.ToString());
-							tmpS.Append("</td>");
-							tmpS.Append("<td>");
-							tmpS.Append(ThisVariantID.ToString());
-							tmpS.Append("</td>");
-							tmpS.Append("<td>");
-							tmpS.Append("<a target=\"entityBody\" href=\"" + AppLogic.AdminLinkUrl("product.aspx") + "?productid=" + ThisProductID.ToString() + "&entityname=" + EntityName + "&entityid=" + EntityID.ToString() + "\">");
-							tmpS.Append(DB.RowFieldByLocale(row, "Name", cust.LocaleSetting));
-							tmpS.Append("</a>");
-							tmpS.Append("</td>\n");
-							tmpS.Append("<td>");
-							tmpS.Append("<a target=\"entityBody\" href=\"" + AppLogic.AdminLinkUrl("variant.aspx") + "?productid=" + ThisProductID.ToString() + "&variantid=" + ThisVariantID.ToString() + "\">");
-							tmpS.Append(DB.RowFieldByLocale(row, "VariantName", cust.LocaleSetting));
-							tmpS.Append("</a>");
-							tmpS.Append("</td>\n");
-							foreach (DataRow row2 in dtShippingMethods.Rows)
+							foreach(DataRow row2 in dtShippingMethods.Rows)
 							{
-								tmpS.Append("<td>");
-								tmpS.Append("<input class=\"default\" maxLength=\"10\" size=\"10\" name=\"ShippingCost_" + ThisVariantID.ToString() + "_" + DB.RowFieldInt(row2, "ShippingMethodID") + "\" value=\"" + Localization.CurrencyStringForDBWithoutExchangeRate(Shipping.GetVariantShippingCost(ThisVariantID, DB.RowFieldInt(row2, "ShippingMethodID"))) + "\">\n");
-								tmpS.Append("<input type=\"hidden\" name=\"ShippingCost_" + ThisVariantID.ToString() + "_" + DB.RowFieldInt(row2, "ShippingMethodID") + "_vldt\" value=\"[number][invalidalert=" + AppLogic.GetString("admin.common.ValidDollarAmountPrompt", SkinID, LocaleSetting) + "]\">\n");
-								tmpS.Append("</td>\n");
+								body.Append("<td>");
+								body.Append("<input class=\"default\" maxLength=\"10\" size=\"10\" name=\"ShippingCost_" + variantId.ToString() + "_" + DB.RowFieldInt(row2, "ShippingMethodID") + "\" value=\"" + Localization.CurrencyStringForDBWithoutExchangeRate(Shipping.GetVariantShippingCost(variantId, DB.RowFieldInt(row2, "ShippingMethodID"))) + "\">\n");
+								body.Append("<input type=\"hidden\" name=\"ShippingCost_" + variantId.ToString() + "_" + DB.RowFieldInt(row2, "ShippingMethodID") + "_vldt\" value=\"[number][invalidalert=" + AppLogic.GetString("admin.common.ValidDollarAmountPrompt", SkinID, LocaleSetting) + "]\">\n");
+								body.Append("</td>\n");
 							}
-							tmpS.Append("</tr>\n");
-						}
-						tmpS.Append("</table>\n");
 
+							body.Append("</tr>\n");
+						}
+
+						body.Append("</table>\n");
 					}
 				}
 				else
@@ -158,8 +157,8 @@ namespace AspDotNetStorefrontAdmin
 					MainBody.Visible = false;
 				}
 
-				ltBody.Text = tmpS.ToString();
+				ltBody.Text = body.ToString();
 			}
 		}
-    }
+	}
 }

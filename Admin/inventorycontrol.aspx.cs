@@ -15,80 +15,45 @@ namespace AspDotNetStorefrontAdmin
 {
 	public partial class _InventoryControl : AdminPageBase
 	{
+		string SelectedLocale;
+
 		protected void Page_Load(object sender, EventArgs e)
 		{
 			Page.Form.DefaultButton = btnUpdate.UniqueID;
+			
+			SelectedLocale = LocaleSelector
+				.GetSelectedLocale()
+				.Name;
 
 			if(!Page.IsPostBack)
-			{
-				LoadLocaleContent();
-				LoadPageContent();
-			}
+				LoadPageContent(SelectedLocale);
+		}
+
+		protected void Page_PreRender(object sender, EventArgs e)
+		{
+			DataBind();
 		}
 
 		protected void btnUpdate_Click(object sender, EventArgs e)
 		{
-			string locale = Localization.GetDefaultLocale();
-			if(ddlLocale.SelectedValue != null)
-				locale = ddlLocale.SelectedValue;
-
-			UpdateStringResources(locale);
+			UpdateStringResources(SelectedLocale);
 			UpdateAppConfigs();
-			LoadPageContent();
+			LoadPageContent(SelectedLocale);
 			ctrlAlertMessage.PushAlertMessage(AppLogic.GetString("admin.common.updated", ThisCustomer.LocaleSetting), AlertMessage.AlertType.Success);
 		}
 
-		/// <summary>
-		/// Change the locale
-		/// </summary>
-		protected void ddlLocale_SelectedIndexChanged(object sender, EventArgs e)
+		protected void LocaleSelector_SelectedLocaleChanged(object sender, EventArgs e)
 		{
-			LoadPageContent();
+			LoadPageContent(SelectedLocale);
 		}
 
-		/// <summary>
-		/// Get all the localesetting
-		/// </summary>
-		private void LoadLocaleContent()
+		void LoadPageContent(string locale)
 		{
-			if(!Page.IsPostBack)
-			{
-				ddlLocale.Items.Clear();
-				//Populate the dropdowlist for localesetting
-				using(SqlConnection conn = new SqlConnection(DB.GetDBConn()))
-				{
-					conn.Open();
-					using(IDataReader localeReader = DB.GetRS("SELECT Name, Description FROM LocaleSetting  with (NOLOCK)  ORDER BY DisplayOrder,Name", conn))
-					{
-						while(localeReader.Read())
-						{
-							ddlLocale.Items.Add(new ListItem(DB.RSField(localeReader, "Description"), DB.RSField(localeReader, "Name")));
-						}
-					}
-				}
-				if(ddlLocale.Items.Count < 2)//If only have 1 locale dont show the dropdown
-				{
-					pnlLocale.Visible = false;
-				}
-				else
-				{
-					ddlLocale.SelectedValue = LocaleSetting;
-				}
-			}
-		}
-
-		/// <summary>
-		/// Set the initial value
-		/// </summary>
-		private void LoadPageContent()
-		{
-			string locale = ddlLocale.SelectedValue ?? Localization.GetDefaultLocale();
-
 			LoadAppConfigs();
 			LoadStringResources(locale);
 		}
 
-		private void LoadAppConfigs()
+		void LoadAppConfigs()
 		{
 			txtHideProductsWithLessThanThisInventoryLevel.Text = AppLogic.AppConfig("HideProductsWithLessThanThisInventoryLevel", 0, false);
 			txtOutOfStockThreshold.Text = AppLogic.AppConfig("OutOfStockThreshold", 0, false);
@@ -100,11 +65,11 @@ namespace AspDotNetStorefrontAdmin
 
 			rdbShowOutOfStockMessage.SelectedIndex = AppLogic.AppConfigBool("KitInventory.ShowOutOfStockMessage", 0, true) == true ? 0 : 1;
 			rblAllowSaleOfOutOfStock.SelectedIndex = AppLogic.AppConfigBool("KitInventory.AllowSaleOfOutOfStock", 0, true) == true ? 0 : 1;
-			
+
 			chkProductPageOutOfStockRedirect.Checked = AppLogic.AppConfigBool("ProductPageOutOfStockRedirect", 0, true);
 		}
 
-		private void UpdateAppConfigs()
+		void UpdateAppConfigs()
 		{
 			AppConfigManager.SetAppConfigDBAndCache(0, "Inventory.LimitCartToQuantityOnHand", chkLimitCartToQuantityOnHand.Checked.ToString());
 
@@ -119,12 +84,10 @@ namespace AspDotNetStorefrontAdmin
 			AppConfigManager.SetAppConfigDBAndCache(0, "KitInventory.AllowSaleOfOutOfStock", rblAllowSaleOfOutOfStock.SelectedValue.ToString());
 
 			AppConfigManager.SetAppConfigDBAndCache(0, "ProductPageOutOfStockRedirect", chkProductPageOutOfStockRedirect.Checked.ToString().ToLower());
-
 		}
 
-		private void LoadStringResources(string locale)
+		void LoadStringResources(string locale)
 		{
-			//Set initial value, this is from stringresource 
 			txtProductOutOfStockMessage.Text = AppLogic.GetString("OutOfStock.DisplayOutOfStockOnProductPage", SkinID, locale);
 			txtEntityOutOfStockMessage.Text = AppLogic.GetString("OutOfStock.DisplayOutOfStockOnEntityPage", SkinID, locale);
 			txtProductInStockMessage.Text = AppLogic.GetString("OutOfStock.DisplayInStockOnProductPage", SkinID, locale);
@@ -132,27 +95,27 @@ namespace AspDotNetStorefrontAdmin
 			txtKitItemOutOfStockSellAnyway.Text = AppLogic.GetString("OutofStock.DisplaySellableOutOfStockOnKitPage", SkinID, locale);
 		}
 
-		private void UpdateStringResources(string locale)
+		void UpdateStringResources(string locale)
 		{
-			var displayOutOfStockOnProduct = StringResourceManager.GetStringResource(AppLogic.StoreID(), locale, "OutofStock.DisplayOutOfStockOnProductPage");
-			if(displayOutOfStockOnProduct != null)
-				displayOutOfStockOnProduct.Update("OutofStock.DisplayOutOfStockOnProductPage", locale, txtProductOutOfStockMessage.Text.Trim());
+			UpdateStringResource("OutofStock.DisplayOutOfStockOnProductPage", txtProductOutOfStockMessage.Text, locale);
+			UpdateStringResource("OutofStock.DisplayOutOfStockOnEntityPage", txtEntityOutOfStockMessage.Text, locale);
+			UpdateStringResource("OutofStock.DisplayInStockOnProductPage", txtProductInStockMessage.Text, locale);
+			UpdateStringResource("OutofStock.DisplayInStockOnEntityPage", txtEntityInStockMessage.Text, locale);
+			UpdateStringResource("OutofStock.DisplaySellableOutOfStockOnKitPage", txtKitItemOutOfStockSellAnyway.Text, locale);
+		}
 
-			var displayOutOfStockOnEntity = StringResourceManager.GetStringResource(AppLogic.StoreID(), locale, "OutofStock.DisplayOutOfStockOnEntityPage");
-			if(displayOutOfStockOnEntity != null)
-				displayOutOfStockOnEntity.Update("OutofStock.DisplayOutOfStockOnEntityPage", locale, txtEntityOutOfStockMessage.Text.Trim());
-
-			var displayInStockOnProduct = StringResourceManager.GetStringResource(AppLogic.StoreID(), locale, "OutofStock.DisplayInStockOnProductPage");
-			if(displayInStockOnProduct != null)
-				displayInStockOnProduct.Update("OutofStock.DisplayInStockOnProductPage", locale, txtProductInStockMessage.Text.Trim());
-
-			var displayInStockOnEntity = StringResourceManager.GetStringResource(AppLogic.StoreID(), locale, "OutofStock.DisplayInStockOnEntityPage");
-			if(displayInStockOnEntity != null)
-				displayInStockOnEntity.Update("OutofStock.DisplayInStockOnEntityPage", locale, txtEntityInStockMessage.Text.Trim());
-
-			var displaySellableOutOfStockOnKitPage = StringResourceManager.GetStringResource(AppLogic.StoreID(), locale, "OutofStock.DisplaySellableOutOfStockOnKitPage");
-			if(displaySellableOutOfStockOnKitPage != null)
-				displaySellableOutOfStockOnKitPage.Update("OutofStock.DisplaySellableOutOfStockOnKitPage", locale, txtKitItemOutOfStockSellAnyway.Text.Trim());
+		private void UpdateStringResource(string name, string value, string locale)
+		{
+			var stringResource = StringResourceManager.GetStringResource(AppLogic.StoreID(), locale, name);
+			if(stringResource == null)
+			{
+				StringResource.Create(AppLogic.StoreID(), name, locale, value.Trim());
+				
+				// Reload string resources from DB. Necessary after creating a new string resource.
+				StringResourceManager.LoadAllStrings(false);
+			}
+			else
+				stringResource.Update(name, locale, value.Trim());
 		}
 	}
 }

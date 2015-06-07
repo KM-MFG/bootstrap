@@ -88,7 +88,7 @@ namespace AspDotNetStorefrontAdmin
 			using(SqlConnection conn = new SqlConnection(DB.GetDBConn()))
 			{
 				conn.Open();
-				using(IDataReader rs = DB.GetRS("select * from Manufacturer   with (NOLOCK)  where deleted=0 order by DisplayOrder,Name", conn))
+				using(IDataReader rs = DB.GetRS("select ManufacturerID, Name from Manufacturer with (NOLOCK) where deleted=0 order by DisplayOrder,Name", conn))
 				{
 					while(rs.Read())
 					{

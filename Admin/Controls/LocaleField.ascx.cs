@@ -103,7 +103,7 @@ namespace AspDotNetStorefrontControls
 					{
 						var value = item.FindControl<TextBox>("txtValue").Text.Trim();
 						var locale = item.FindControl<HiddenField>("localeName");
-						localeString.AppendFormat(@"<locale name=""{0}"">{1}</locale>", locale.Value, value);
+						localeString.AppendFormat(@"<locale name=""{0}"">{1}</locale>", locale.Value, value.Replace("<", String.Empty).Replace("&", String.Empty));
 					}
 					localeString.Append("</ml>");
 				}

@@ -8,6 +8,7 @@
 <%@ Register Src="controls/CheckoutSteps.ascx" TagName="CheckoutSteps" TagPrefix="checkout" %>
 
 <asp:Content ID="Content1" runat="server" ContentPlaceHolderID="PageContent">
+	<script type="text/javascript" src="jscripts/tooltip.js" ></script>
 	<asp:Panel ID="pnlContent" runat="server">
 		<div class="page-wrap payment-page">
 

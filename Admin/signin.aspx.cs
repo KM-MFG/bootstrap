@@ -249,6 +249,7 @@ public partial class signin : System.Web.UI.Page
 
 
 		// we've got a good login:
+		c.ThisCustomerSession.UpdateCustomerSession(null, null);
 		object lockeduntil = DateTime.Now.AddMinutes(-1);
 		c.UpdateCustomer(
 			/*CustomerLevelID*/ null,

@@ -172,6 +172,9 @@ namespace AspDotNetStorefrontAdmin
 								case "TUNEINDEXES":
 									TuneIndexes.Checked = (ParmValue == "TRUE");
 									break;
+								case "UPDATESTATISTICS":
+									UpdateStatistics.Checked = (ParmValue == "TRUE");
+									break;
 								case "CLEARPROFILES":
 									EraseProfileLog.SelectedValue = ParmValue;
 									break;
@@ -231,6 +234,7 @@ namespace AspDotNetStorefrontAdmin
 				DB.CreateSQLParameter("@ClearProductViewsOrderThan", SqlDbType.SmallInt, 2, Convert.ToInt16(ClearProductViewsOlderThan.SelectedValue), ParameterDirection.Input),
 				DB.CreateSQLParameter("@EraseCCFromOrdersOlderThan", SqlDbType.SmallInt, 2, Convert.ToInt16(EraseOrderCreditCards.SelectedValue), ParameterDirection.Input),
 				DB.CreateSQLParameter("@DefragIndexes", SqlDbType.TinyInt, 1, CommonLogic.IIF(TuneIndexes.Checked, 1, 0), ParameterDirection.Input),
+				DB.CreateSQLParameter("@UpdateStats", SqlDbType.TinyInt, 1, CommonLogic.IIF(UpdateStatistics.Checked, 1, 0), ParameterDirection.Input),
 				DB.CreateSQLParameter("@PurgeDeletedRecords", SqlDbType.TinyInt, 1, CommonLogic.IIF(PurgeDeletedRecords.Checked, 1, 0), ParameterDirection.Input),
 				DB.CreateSQLParameter("@RemoveRTShippingDataOlderThan", SqlDbType.SmallInt, 2, Convert.ToInt16(dlClearRTShippingData.SelectedValue), ParameterDirection.Input),
 				DB.CreateSQLParameter("@ClearSearchLogOlderThan", SqlDbType.SmallInt, 2, Convert.ToInt16(dlClearSearchData.SelectedValue), ParameterDirection.Input),
@@ -298,6 +302,9 @@ namespace AspDotNetStorefrontAdmin
 				tmpS.Append(",");
 				tmpS.Append("TuneIndexes=");
 				tmpS.Append(TuneIndexes.Checked);
+				tmpS.Append(",");
+				tmpS.Append("UpdateStatistics=");
+				tmpS.Append(UpdateStatistics.Checked);
 				tmpS.Append(",");
 				tmpS.Append("CleanUpLocalizationData=");
 				tmpS.Append(CleanupLocalizationData.Checked);

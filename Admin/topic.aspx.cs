@@ -29,12 +29,6 @@ namespace AspDotNetStorefrontAdmin
 			}
 		}
 
-		string DisplayedLocale
-		{
-			get { return (string)ViewState["SelectedLocaleSetting"] ?? Localization.GetDefaultLocale(); }
-			set { ViewState["SelectedLocaleSetting"] = value; }
-		}
-
 		bool UseHtmlEditor
 		{ get { return !AppLogic.AppConfigBool("TurnOffHtmlEditorInAdminSite"); } }
 
@@ -50,11 +44,8 @@ namespace AspDotNetStorefrontAdmin
 
 		protected void Page_Load(object sender, EventArgs e)
 		{
-			radDescription.DisableFilter(Telerik.Web.UI.EditorFilters.RemoveScripts);
-
 			if(!IsPostBack)
 			{
-				LoadLocales();
 				Page.DataBind();
 				LoadTopic();
 
@@ -64,6 +55,12 @@ namespace AspDotNetStorefrontAdmin
 						? "admin.topic.addnew".StringResource()
 						: "admin.topic.editing".StringResource();
 			}
+		}
+
+		protected override void OnPreRender(EventArgs e)
+		{
+			base.OnPreRender(e);
+			DataBind();
 		}
 
 		protected void btnSave_Click(object sender, EventArgs e)
@@ -105,34 +102,17 @@ namespace AspDotNetStorefrontAdmin
 			ApplicationInstance.CompleteRequest();
 		}
 
-		protected void ddlLocales_SelectedIndexChanged(object sender, EventArgs e)
+		protected void LocaleSelector_SelectedLocaleChanged(Object sender, EventArgs e)
 		{
-			DisplayedLocale = ddlLocales.SelectedValue;
 			LoadTopic();
-		}
-
-		void LoadLocales()
-		{
-			ddlLocales.Items.Clear();
-
-			using(SqlConnection conn = new SqlConnection(DB.GetDBConn()))
-			{
-				conn.Open();
-				using(IDataReader localeReader = DB.GetRS("SELECT Name, Description FROM LocaleSetting  with (NOLOCK)  ORDER BY DisplayOrder,Name", conn))
-				{
-					while(localeReader.Read())
-					{
-						ddlLocales.Items.Add(new ListItem(DB.RSField(localeReader, "Description"), DB.RSField(localeReader, "Name")));
-					}
-				}
-			}
-
-			ddlLocales.SelectFirstByValue(Localization.GetDefaultLocale());
-			pnlLocaleBar.Visible = ddlLocales.Items.Count > 1;
 		}
 
 		void LoadTopic()
 		{
+			var locale = LocaleSelector
+				.GetSelectedLocale()
+				.Name;
+
 			if(TopicId == null)
 			{
 				//creating Topic
@@ -175,21 +155,21 @@ namespace AspDotNetStorefrontAdmin
 							return;
 						}
 
-						txtTopicName.Text = DB.RSFieldByLocale(reader, "Name", DisplayedLocale);
-						txtTopicTitle.Text = DB.RSFieldByLocale(reader, "Title", DisplayedLocale);
+						txtTopicName.Text = DB.RSFieldByLocale(reader, "Name", locale);
+						txtTopicTitle.Text = DB.RSFieldByLocale(reader, "Title", locale);
 
 						if(UseHtmlEditor)
-							radDescription.Content = DB.RSFieldByLocale(reader, "Description", DisplayedLocale);
+							radDescription.Content = DB.RSFieldByLocale(reader, "Description", locale);
 						else
 						{
 							txtDescriptionNoHtmlEditor.Visible = true;
-							txtDescriptionNoHtmlEditor.Text = Server.HtmlEncode(DB.RSFieldByLocale(reader, "Description", DisplayedLocale));
+							txtDescriptionNoHtmlEditor.Text = DB.RSFieldByLocale(reader, "Description", locale);
 							radDescription.Visible = false;
 						}
 
-						ltSETitle.Text = DB.RSFieldByLocale(reader, "SETitle", DisplayedLocale);
-						ltSEKeywords.Text = DB.RSFieldByLocale(reader, "SEKeywords", DisplayedLocale);
-						ltSEDescription.Text = DB.RSFieldByLocale(reader, "SEDescription", DisplayedLocale);
+						ltSETitle.Text = DB.RSFieldByLocale(reader, "SETitle", locale);
+						ltSEKeywords.Text = DB.RSFieldByLocale(reader, "SEKeywords", locale);
+						ltSEDescription.Text = DB.RSFieldByLocale(reader, "SEDescription", locale);
 
 						txtPassword.Text = DB.RSField(reader, "Password");
 
@@ -203,7 +183,7 @@ namespace AspDotNetStorefrontAdmin
 							? 1
 							: 0;
 
-						PopulateCopyToStoreDropdown(DB.RSFieldByLocale(reader, "Name", DisplayedLocale));
+						PopulateCopyToStoreDropdown(DB.RSFieldByLocale(reader, "Name", locale));
 
 						chkPublished.Checked = DB.RSFieldBool(reader, "Published");
 						chkIsFrequent.Checked = DB.RSFieldBool(reader, "IsFrequent");
@@ -216,6 +196,10 @@ namespace AspDotNetStorefrontAdmin
 
 		bool SaveTopic()
 		{
+			var locale = LocaleSelector
+				.GetSelectedLocale()
+				.Name;
+
 			Page.Validate();
 			if(!Page.IsValid)
 				return false;
@@ -230,14 +214,14 @@ namespace AspDotNetStorefrontAdmin
 			}
 
 			var name = txtTopicName.Text;
-			var title = AppLogic.FormLocaleXml("Title", txtTopicTitle.Text, DisplayedLocale, "topic", Convert.ToInt32(TopicId));
+			var title = AppLogic.FormLocaleXml("Title", txtTopicTitle.Text, locale, "topic", Convert.ToInt32(TopicId));
 			var descriptionText = UseHtmlEditor
 				? radDescription.Content
 				: txtDescriptionNoHtmlEditor.Text;
-			var description = AppLogic.FormLocaleXml("Description", descriptionText, DisplayedLocale, "topic", Convert.ToInt32(TopicId));
-			var seKeywords = AppLogic.FormLocaleXml("SEKeywords", ltSEKeywords.Text, DisplayedLocale, "topic", Convert.ToInt32(TopicId));
-			var seDescription = AppLogic.FormLocaleXml("SEDescription", ltSEDescription.Text, DisplayedLocale, "topic", Convert.ToInt32(TopicId));
-			var seTitle = AppLogic.FormLocaleXml("SETitle", ltSETitle.Text, DisplayedLocale, "topic", Convert.ToInt32(TopicId));
+			var description = AppLogic.FormLocaleXml("Description", descriptionText, locale, "topic", Convert.ToInt32(TopicId));
+			var seKeywords = AppLogic.FormLocaleXml("SEKeywords", ltSEKeywords.Text, locale, "topic", Convert.ToInt32(TopicId));
+			var seDescription = AppLogic.FormLocaleXml("SEDescription", ltSEDescription.Text, locale, "topic", Convert.ToInt32(TopicId));
+			var seTitle = AppLogic.FormLocaleXml("SETitle", ltSETitle.Text, locale, "topic", Convert.ToInt32(TopicId));
 			var displayOrder = Localization.ParseUSInt(txtDspOrdr.Text);
 			var published = chkPublished.Checked;
 			var isFrequent = chkIsFrequent.Checked;

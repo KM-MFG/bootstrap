@@ -88,7 +88,8 @@ namespace AspDotNetStorefrontAdmin
 				using(var command = new SqlCommand(ConfigEditorContext.GetGroupSelectSql(), connection))
 				using(var reader = command.ExecuteReader())
 					while(reader.Read())
-						Group.Items.Add((string)reader["GroupName"]);
+						if(!String.IsNullOrEmpty(reader["GroupName"].ToString()))
+							Group.Items.Add((string)reader["GroupName"]);
 
 				// Bind form values
 				using(var command = new SqlCommand(ConfigEditorContext.GetSelectSql(), connection))
@@ -100,7 +101,7 @@ namespace AspDotNetStorefrontAdmin
 					{
 						if(!reader.Read() || (ConfigId != null && reader["ConfigID"] is DBNull))
 						{
-							ctrlAlertMessage.PushAlertMessage("Config not found", AspDotNetStorefrontControls.AlertMessage.AlertType.Error);
+							ctrlAlertMessage.PushAlertMessage("Setting not found", AspDotNetStorefrontControls.AlertMessage.AlertType.Error);
 							EditorPanel.Visible = SaveButtonsTop.Visible = ActionBarBottom.Visible = false;
 							return;
 						}
@@ -122,10 +123,14 @@ namespace AspDotNetStorefrontAdmin
 						// General values
 						Name.Text = reader.Field("ConfigName");
 						Description.Text = reader.Field("Description");
-						Group.SelectFirstByValue(groupName);
 						SuperOnly.SelectFirstByValue(superOnly.ToString());
 						ValueType.SelectFirstByValue(valueType);
 						AllowedValues.Text = allowedValues;
+
+						if(!String.IsNullOrEmpty(groupName))
+							Group.SelectFirstByValue(groupName);
+						else
+							ctrlAlertMessage.PushAlertMessage("This Setting does not have a Group.  Please choose one from the dropdown.", AlertMessage.AlertType.Warning);
 
 						// Show allowed values when appropriate Eumeration, Multi-Select, and Dynamic Invoke
 						var typesThatRequireAllowedValues = new[] { "enum", "multiselect", "invoke" };

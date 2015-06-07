@@ -3,51 +3,48 @@
 <asp:Content runat="server" ContentPlaceHolderID="bodyContentPlaceholder">
 	<h1>
 		<i class="fa fa-pencil-square-o"></i>
-		<asp:Literal ID="litStage" runat="server" />
+		<asp:Literal runat="server" ID="litStage" />
 	</h1>
-	<aspdnsf:AlertMessage ID="ctlAlertMessage" runat="server" />
+	<aspdnsf:AlertMessage runat="server" ID="ctlAlertMessage" />
 
-	<asp:Panel ID="pnlUpload" runat="server" DefaultButton="btnSubmit">
+	<asp:Panel runat="server" ID="pnlUpload" DefaultButton="btnSubmit">
 		<div class="white-ui-box">
 			<div class="white-box-heading">
-				<asp:Literal ID="litUploadInstructions" runat="server" Text="<%$ Tokens:StringResource, admin.stringresources.UploadFile %>" />
+				<asp:Literal runat="server" Text="<%$ Tokens:StringResource, admin.stringresources.UploadFile %>" />
 			</div>
 			<p>
-				<asp:Literal ID="litSelectFileInstructions" runat="server" />
+				<asp:Literal runat="server" ID="litSelectFileInstructions" />
 			</p>
 			<div class="form-group">
 				*<asp:Label runat="server" AssociatedControlID="fuMain" Text="<%$ Tokens:StringResource, admin.stringresources.File %>" />
-				<asp:FileUpload ID="fuMain" CssClass="fileUpload" runat="server" />
-				<asp:RequiredFieldValidator runat="server" ID="RequiredFieldValidator" ControlToValidate="fuMain"
-					ErrorMessage="Required" CssClass="text-danger" />
+				<asp:FileUpload runat="server" ID="fuMain" CssClass="fileUpload" />
+				<asp:RequiredFieldValidator runat="server" ControlToValidate="fuMain" ErrorMessage="Required" CssClass="text-danger" />
 			</div>
 			<div class="form-group">
-				<asp:CheckBox ID="chkReplaceExisting" runat="server" Text="<%$ Tokens:StringResource, admin.stringresources.ReplaceExisting %>" />
-				<asp:CheckBox ID="chkLeaveModified" runat="server" Text="<%$ Tokens:StringResource, admin.stringresources.LeaveModified %>" />
+				<asp:CheckBox runat="server" ID="chkReplaceExisting" Text="<%$ Tokens:StringResource, admin.stringresources.ReplaceExisting %>" />
+				<asp:CheckBox runat="server" ID="chkLeaveModified" Text="<%$ Tokens:StringResource, admin.stringresources.LeaveModified %>" />
 			</div>
 		</div>
 
 		<div class="item-action-bar">
-			<asp:HyperLink ID="lnkBack1" runat="server" Text="<%$ Tokens:StringResource,admin.common.cancel %>" CssClass="btn btn-default"></asp:HyperLink>
-			<asp:Button ID="btnSubmit" CssClass="btn btn-primary" runat="server" Text="<%$Tokens:StringResource, admin.common.Upload %>"
-				OnClick="btnSubmit_Click" />
+			<asp:HyperLink runat="server" ID="lnkBack1" Text="<%$ Tokens:StringResource,admin.common.cancel %>" CssClass="btn btn-default" />
+			<asp:Button runat="server" ID="btnSubmit" CssClass="btn btn-primary" Text="<%$Tokens:StringResource, admin.common.Upload %>" OnClick="btnSubmit_Click" />
 		</div>
 	</asp:Panel>
 
-	<asp:Panel ID="pnlReload" runat="server" DefaultButton="btnReload">
+	<asp:Panel runat="server" ID="pnlReload" DefaultButton="btnReload">
 		<div class="white-ui-box">
 			<div class="white-box-heading">
 				<asp:Literal runat="server" Text="<%$ Tokens:StringResource, admin.stringresources.ReloadFromServer %>" />
 			</div>
 			<div class="form-group">
-				<asp:CheckBox ID="chkReloadReplaceExisting" runat="server" Text="<%$ Tokens:StringResource, admin.stringresources.ReplaceExisting %>" />
-				<asp:CheckBox ID="chkReloadLeaveModified" runat="server" Text="<%$ Tokens:StringResource, admin.stringresources.LeaveModified %>" />
+				<asp:CheckBox runat="server" ID="chkReloadReplaceExisting" Text="<%$ Tokens:StringResource, admin.stringresources.ReplaceExisting %>" />
+				<asp:CheckBox runat="server" ID="chkReloadLeaveModified" Text="<%$ Tokens:StringResource, admin.stringresources.LeaveModified %>" />
 			</div>
 		</div>
 		<div class="item-action-bar">
-			<asp:HyperLink ID="lnkBack2" runat="server" Text="<%$Tokens:StringResource, admin.common.cancel%>" CssClass="btn btn-default"></asp:HyperLink>
-			<asp:Button ID="btnReload" CssClass="btn btn-primary" runat="server" Text="<%$Tokens:StringResource, admin.importstringresourcefile1.ReloadReview %>"
-				OnClick="btnReload_Click" />
+			<asp:HyperLink runat="server" ID="lnkBack2" Text="<%$Tokens:StringResource, admin.common.cancel%>" CssClass="btn btn-default" />
+			<asp:Button runat="server" ID="btnReload" CssClass="btn btn-primary" Text="<%$Tokens:StringResource, admin.importstringresourcefile1.ReloadReview %>" OnClick="btnReload_Click" />
 		</div>
 	</asp:Panel>
 </asp:Content>

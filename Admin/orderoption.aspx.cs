@@ -5,7 +5,6 @@
 // THE ABOVE NOTICE MUST REMAIN INTACT. 
 // --------------------------------------------------------------------------------
 using System;
-using System.Data;
 using System.Data.SqlClient;
 using System.IO;
 using System.Text;
@@ -19,9 +18,16 @@ namespace AspDotNetStorefrontAdmin
 	{
 		readonly bool UseHtmlEditor;
 
-		string SelectedLocale
+		string selectedLocale;
+		String Locale
 		{
-			get { return !string.IsNullOrWhiteSpace(ddLocales.SelectedValue) ? ddLocales.SelectedValue : Localization.GetDefaultLocale(); }
+			get
+			{
+				if(String.IsNullOrEmpty(selectedLocale))
+					selectedLocale = LocaleSelector.GetSelectedLocale().Name;
+
+				return selectedLocale;
+			}
 		}
 
 		int RecordId
@@ -44,29 +50,25 @@ namespace AspDotNetStorefrontAdmin
 			if(Page.IsPostBack)
 				return;
 
-			LoadLocales();
-			LoadTaxClasses();
-			LoadScript();
-			LoadForm(RecordId);
+			LoadData();
 		}
 
 		protected override void OnPreRender(EventArgs e)
 		{
 			base.OnPreRender(e);
 
+			DataBind();
 			btnClose.DataBind();
 			btnCloseTop.DataBind();
-		}
-
-		protected void ddLocales_SelectedIndexChanged(object sender, EventArgs e)
-		{
-			LoadForm(RecordId);
 		}
 
 		protected void btnSubmit_Click(object sender, EventArgs e)
 		{
 			if(SaveForm(RecordId))
-				Response.Redirect(String.Format("orderoption.aspx?optionid={0}", RecordId));
+			{
+				var localeQueryString = LocaleSelector.HasMultipleLocales() ? String.Format("&locale.selection={0}", Locale) : String.Empty;
+				Response.Redirect(String.Format("orderoption.aspx?optionid={0}{1}", RecordId, localeQueryString));
+			}
 		}
 
 		protected void btnSaveAndClose_Click(object sender, EventArgs e)
@@ -104,7 +106,7 @@ namespace AspDotNetStorefrontAdmin
 						if(reader.Read())
 						{
 							litOrderOptionId.Text = recordId.ToString();
-							txtName.Text = DB.RSFieldByLocale(reader, "Name", SelectedLocale);
+							txtName.Text = DB.RSFieldByLocale(reader, "Name", Locale);
 							txtCost.Text = DB.RSFieldDecimal(reader, "Cost").ToString();
 							txtDisplayOrder.Text = DB.RSFieldInt(reader, "DisplayOrder").ToString();
 							ddlTaxClass.SelectedValue = DB.RSFieldInt(reader, "TaxClassID").ToString();
@@ -112,13 +114,13 @@ namespace AspDotNetStorefrontAdmin
 
 							if(UseHtmlEditor)
 							{
-								radCopy.Content = DB.RSFieldByLocale(reader, "Description", SelectedLocale);
+								radCopy.Content = DB.RSFieldByLocale(reader, "Description", Locale);
 							}
 							else
 							{
 								txtDescription.Visible = true;
 								radCopy.Visible = false;
-								txtDescription.Text = DB.RSFieldByLocale(reader, "Description", SelectedLocale);
+								txtDescription.Text = DB.RSFieldByLocale(reader, "Description", Locale);
 							}
 						}
 					}
@@ -163,23 +165,23 @@ namespace AspDotNetStorefrontAdmin
 					optionDisplayOrder = parsedDisplayOrder;
 
 				var optionName = editing
-					? AppLogic.FormLocaleXml("Name", txtName.Text.Trim(), SelectedLocale, "orderoption", recordId)
-					: AppLogic.FormLocaleXml(txtName.Text.Trim(), SelectedLocale);
+					? AppLogic.FormLocaleXml("Name", txtName.Text.Trim(), Locale, "orderoption", recordId)
+					: AppLogic.FormLocaleXml(txtName.Text.Trim(), Locale);
 
 				var description = String.Empty;
 				if(editing)
 				{
 					if(UseHtmlEditor)
-						description = AppLogic.FormLocaleXml("Description", radCopy.Content, SelectedLocale, "orderoption", recordId);
+						description = AppLogic.FormLocaleXml("Description", radCopy.Content, Locale, "orderoption", recordId);
 					else
-						description = AppLogic.FormLocaleXmlEditor("Description", "Description", SelectedLocale, "orderoption", recordId);
+						description = AppLogic.FormLocaleXmlEditor("Description", "Description", Locale, "orderoption", recordId);
 				}
 				else
 				{
 					if(UseHtmlEditor)
-						description = AppLogic.FormLocaleXml(radCopy.Content, SelectedLocale);
+						description = AppLogic.FormLocaleXml(radCopy.Content, Locale);
 					else
-						description = AppLogic.FormLocaleXmlEditor("Description", "Description", SelectedLocale, "orderoption", recordId);
+						description = AppLogic.FormLocaleXmlEditor("Description", "Description", Locale, "orderoption", recordId);
 				}
 
 				var parameters = new[]
@@ -278,32 +280,16 @@ namespace AspDotNetStorefrontAdmin
 			cs.RegisterClientScriptBlock(this.Page.GetType(), Guid.NewGuid().ToString(), script.ToString(), true);
 		}
 
-		void LoadLocales()
+		void LoadData()
 		{
-			ddLocales.Items.Clear();
+			LoadTaxClasses();
+			LoadScript();
+			LoadForm(RecordId);
+		}
 
-			try
-			{
-				var localeCount = DB.GetSqlN("select count(Name) as N from LocaleSetting with (NOLOCK)");
-				if(localeCount > 1)
-					pnlLocale.Visible = true;
-
-				using(var connection = new SqlConnection(DB.GetDBConn()))
-				{
-					connection.Open();
-					using(IDataReader localeReader = DB.GetRS("SELECT Name, Description FROM LocaleSetting  with (NOLOCK)  ORDER BY DisplayOrder,Name", connection))
-					{
-						while(localeReader.Read())
-						{
-							ddLocales.Items.Add(new ListItem(DB.RSField(localeReader, "Description"), DB.RSField(localeReader, "Name")));
-						}
-					}
-				}
-			}
-			catch(Exception ex)
-			{
-				ctlAlertMessage.PushAlertMessage(ex.ToString(), AspDotNetStorefrontControls.AlertMessage.AlertType.Error);
-			}
+		protected void LocaleSelector_SelectedLocaleChanged(Object sender, EventArgs e)
+		{
+			LoadData();
 		}
 	}
 }

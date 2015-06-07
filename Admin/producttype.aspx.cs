@@ -72,7 +72,7 @@ namespace AspDotNetStorefrontAdmin
 		protected void btnSubmit_Click(object sender, EventArgs e)
 		{
 			if(SaveType())
-				Response.Redirect(String.Format("producttype.aspx?stateid={0}", TypeId));
+				Response.Redirect(String.Format("producttype.aspx?typeid={0}", TypeId));
 		}
 
 		protected void btnSaveAndClose_Click(object sender, EventArgs e)
@@ -109,7 +109,7 @@ namespace AspDotNetStorefrontAdmin
 			try
 			{
 				DB.ExecuteSQL(saveSql, saveParams.ToArray());
-				ctlAlertMessage.PushAlertMessage("admin.orderdetails.UpdateSuccessful".StringResource(), AlertMessage.AlertType.Success);
+				ctlAlertMessage.PushAlertMessage("admin.editproducttype.UpdateSuccessful".StringResource(), AlertMessage.AlertType.Success);
 			}
 			catch(Exception ex)
 			{

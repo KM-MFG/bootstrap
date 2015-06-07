@@ -97,7 +97,7 @@ namespace AspDotNetStorefrontAdmin
 			// Determine HTML editor configuration
 			useHtmlEditor = !AppLogic.AppConfigBool("TurnOffHtmlEditorInAdminSite");
 			radDescription.Visible = useHtmlEditor;
-			radDescription.DisableFilter(Telerik.Web.UI.EditorFilters.RemoveScripts);
+			txtDescriptionNoHtmlEditor.Visible = !useHtmlEditor;
 
 			UseSpecialRecurringIntervals = AppLogic.UseSpecialRecurringIntervals();
 			ShipCalcID = Shipping.GetActiveShippingCalculationID();
@@ -319,9 +319,9 @@ namespace AspDotNetStorefrontAdmin
 
 						txtName.Text = XmlCommon.GetLocaleEntry(DB.RSField(rs, "Name"), locale, false);
 
-						txtSKU.Text = Server.HtmlEncode(DB.RSField(rs, "SKUSuffix"));
-						txtManufacturePartNumber.Text = Server.HtmlEncode(DB.RSField(rs, "ManufacturerPartNumber"));
-						txtGTIN.Text = Server.HtmlEncode(DB.RSField(rs, "GTIN"));
+						txtSKU.Text = DB.RSField(rs, "SKUSuffix");
+						txtManufacturePartNumber.Text = DB.RSField(rs, "ManufacturerPartNumber");
+						txtGTIN.Text = DB.RSField(rs, "GTIN");
 						if(!DB.RSFieldBool(rs, "Published"))
 						{
 							rblPublished.BackColor = Color.LightYellow;
@@ -352,11 +352,7 @@ namespace AspDotNetStorefrontAdmin
 						}
 						else
 						{
-							ltDescription.Text = ("<div class=\"form-group\">");
-							ltDescription.Text += ("<div class=\"col-sm-6\">");
-							ltDescription.Text += ("<textarea class=\"form-control multiExtension\" id=\"Description\" name=\"Description\">" + XmlCommon.GetLocaleEntry(HttpContext.Current.Server.HtmlEncode(DB.RSField(rs, "Description")), locale, false) + "</textarea>\n");
-							ltDescription.Text += ("</div>");
-							ltDescription.Text += ("</div>");
+							txtDescriptionNoHtmlEditor.Text = XmlCommon.GetLocaleEntry(DB.RSField(rs, "Description"), locale, false);
 						}
 
 						//FROOGLE
@@ -609,16 +605,6 @@ namespace AspDotNetStorefrontAdmin
 						btnSubmit.Text = btnSubmitBottom.Text = "Add New";
 						btnSubmit.CssClass = btnSubmitBottom.CssClass = "btn btn-action";
 
-						//DESCRIPTION
-						if(!useHtmlEditor)
-						{
-							ltDescription.Text = ("<div class=\"form-group\">");
-							ltDescription.Text += ("<div class=\"col-sm-6\">");
-							ltDescription.Text += ("<textarea class=\"form-control multiExtension\" id=\"Description\" name=\"Description\"></textarea>\n");
-							ltDescription.Text += ("</div>");
-							ltDescription.Text += ("</div>");
-						}
-
 						//INVENTORY
 						trCurrentInventory.Visible = false;
 						trManageInventory.Visible = false;
@@ -806,7 +792,7 @@ namespace AspDotNetStorefrontAdmin
 				}
 				else
 				{
-					temp = AppLogic.FormLocaleXmlEditorVariant("Description", "Description", locale, variantId);
+					temp = AppLogic.FormLocaleXmlEditorVariant("Description", txtDescriptionNoHtmlEditor.Text.Trim(), locale, variantId);
 				}
 				if(temp.Length != 0)
 				{
@@ -931,7 +917,7 @@ namespace AspDotNetStorefrontAdmin
 				}
 				else
 				{
-					temp = AppLogic.FormLocaleXmlEditorVariant("Description", "Description", locale, variantId);
+					temp = AppLogic.FormLocaleXmlVariant("Description", txtDescriptionNoHtmlEditor.Text.Trim(), locale, variantId);
 				}
 				if(temp.Length != 0)
 				{

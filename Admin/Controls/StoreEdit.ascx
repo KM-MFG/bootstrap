@@ -80,7 +80,7 @@
 					    </div>
 					    <div class="col-xs-10">
 						    <asp:CheckBox ID="cbxBuySafe" runat="server" Checked="true" />
-                            See <a href="http://www.aspdotnetstorefront.com/linkmanager.aspx?topic=9500manual&type=buysafe" target="_blank">Manual</a>
+                            See <a href="http://www.aspdotnetstorefront.com/linkmanager.aspx?topic=9510manual&type=buysafe" target="_blank">Manual</a>
 					    </div>	
 					</div>
 				</asp:PlaceHolder>

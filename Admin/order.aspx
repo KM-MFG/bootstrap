@@ -421,7 +421,7 @@
 									<asp:Literal runat="server" Text="<%$Tokens:StringResource, admin.orderdetails.ReturnActions %>" />
 								</div>
 								<div class="col-md-9">
-									<asp:DropDownList CssClass="form-control" ID="ddlCancelActions" runat="server" Enabled="false" />
+									<asp:DropDownList CssClass="form-control" ID="ddlCancelActions" runat="server" Enabled="false" ClientIDMode="Static" />
 									<asp:Button ID="btnCancel" Enabled="false" runat="server" CssClass="btn btn-primary" OnClick="btnCancel_Click" Text="<%$Tokens:StringResource, admin.common.Submit %>" />
 								</div>
 							</div>

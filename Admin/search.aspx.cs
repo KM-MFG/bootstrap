@@ -50,7 +50,7 @@ namespace AspDotNetStorefrontAdmin
 				using (SqlConnection con = new SqlConnection(DB.GetDBConn()))
 				{
 					con.Open();
-					using (IDataReader rs = DB.GetRS("select * from Category  with (NOLOCK)  where Category.name like " + stquoted + " and Deleted=0 order by DisplayOrder,Name", con))
+					using (IDataReader rs = DB.GetRS(String.Format("select CategoryID from Category with (NOLOCK)  where Category.name like {0} order by DisplayOrder,Name", stquoted), con))
 					{
 						while (rs.Read())
 						{
@@ -78,7 +78,7 @@ namespace AspDotNetStorefrontAdmin
 				using (SqlConnection con = new SqlConnection(DB.GetDBConn()))
 				{
 					con.Open();
-					using (IDataReader rs = DB.GetRS("select * from [Section]  with (NOLOCK)  where Name like " + stquoted + " and Published=1 and Deleted=0 order by DisplayOrder,Name", con))
+					using(IDataReader rs = DB.GetRS(String.Format("select SectionID from [Section]  with (NOLOCK)  where Name like {0} order by DisplayOrder,Name", stquoted), con))
 					{
 						while (rs.Read())
 						{
@@ -106,7 +106,7 @@ namespace AspDotNetStorefrontAdmin
 				using (SqlConnection con = new SqlConnection(DB.GetDBConn()))
 				{
 					con.Open();
-					using (IDataReader rs = DB.GetRS("select * from Manufacturer  with (NOLOCK)  where Name like " + stquoted + " and Deleted=0", con))
+					using(IDataReader rs = DB.GetRS(String.Format("select Name, ManufacturerID from Manufacturer  with (NOLOCK)  where Name like {0} order by DisplayOrder,Name", stquoted), con))
 					{
 						while (rs.Read())
 						{

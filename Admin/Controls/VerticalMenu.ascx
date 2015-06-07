@@ -18,6 +18,7 @@
 					<li><a href="products.aspx"><asp:Literal runat="server" Text="<%$Tokens:StringResource, admin.menu.ProductMgr %>" /></a></li>
 					<li><a href="product.aspx"><asp:Literal runat="server" Text="<%$Tokens:StringResource, admin.products.AddNew %>" /></a></li>	
 					<li><a href="bulkeditprices.aspx"><asp:Literal runat="server" Text="<%$Tokens:StringResource, admin.menu.pricesinventory%>" /></a></li>
+					<li><a href="bulkeditweights.aspx"><asp:Literal runat="server" Text="<%$Tokens:StringResource, admin.title.bulkeditweights%>" /></a></li>
 					<li><a href="entities.aspx?entityname=category"><asp:Literal runat="server" Text="<%$Tokens:StringResource, admin.menu.entities %>" /></a></li>
 					<li><a href="ratings.aspx"><asp:Literal runat="server" Text="<%$Tokens:StringResource, admin.menu.ratings %>" /></a></li>
 					<li><a href="importproductsfromexcel.aspx"><asp:Literal runat="server" Text="<%$Tokens:StringResource, admin.menu.ProductImportExport%>" /></a></li>

@@ -7,6 +7,7 @@
 using AspDotNetStorefrontCore;
 using System.Data;
 using System.Data.SqlClient;
+using System;
 
 namespace AspDotNetStorefront
 {
@@ -32,7 +33,7 @@ namespace AspDotNetStorefront
             using (SqlConnection dbconn = new SqlConnection(DB.GetDBConn()))
             {
                 dbconn.Open();
-                using(IDataReader rs = DB.GetRS("select * from ShoppingCart  with (NOLOCK)  where ShoppingCartRecID=" + ShoppingCartRecID.ToString() + " and CustomerID=" + ThisCustomer.CustomerID.ToString(),dbconn))
+				using(IDataReader rs = DB.GetRS(String.Format("select ProductID from ShoppingCart with (NOLOCK) where ShoppingCartRecID = {0} and CustomerID = {1}", ShoppingCartRecID, ThisCustomer.CustomerID), dbconn))
                 {
                     if (rs.Read())
                     {

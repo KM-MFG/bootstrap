@@ -5,10 +5,6 @@
 // THE ABOVE NOTICE MUST REMAIN INTACT. 
 // --------------------------------------------------------------------------------
 using System;
-using System.Web;
-using System.Data;
-using System.Globalization;
-using AspDotNetStorefrontCommon;
 using AspDotNetStorefrontCore;
 
 namespace AspDotNetStorefront
@@ -29,24 +25,27 @@ namespace AspDotNetStorefront
             // this may be overwridden by the XmlPackage below!
             SectionTitle = AppLogic.GetString("search.aspx.1", SkinID, ThisCustomer.LocaleSetting);
 
-			int minSearchLength = AppLogic.AppConfigNativeInt("MinSearchStringLength");
+			if (!Page.IsPostBack)
+			{
+				int minSearchLength = AppLogic.AppConfigNativeInt("MinSearchStringLength");
 
-            string searchTermFromQueryString = CommonLogic.QueryStringCanBeDangerousContent("SearchTerm");
-			if (minSearchLength <= searchTermFromQueryString.Length)
-			{
-				RunSearch(Server.UrlEncode(searchTermFromQueryString));
+				string searchTermFromQueryString = CommonLogic.QueryStringCanBeDangerousContent("SearchTerm");
+				if(minSearchLength <= searchTermFromQueryString.Length)
+				{
+					RunSearch(Server.UrlEncode(searchTermFromQueryString));
+				}
+				else
+				{
+					litSearch.Text = String.Format(AppLogic.GetString("search.aspx.2", ThisCustomer.LocaleSetting), minSearchLength);
+				}
+
+				base.OnInit(e);
 			}
-			else
-			{
-				litSearch.Text = String.Format(AppLogic.GetString("search.aspx.2", ThisCustomer.LocaleSetting), minSearchLength);
-			}
-           
-            base.OnInit(e);
         }
 
         private void RunSearch(string searchTerm)
         {
-            if (searchTerm.Length != 0)
+			if(searchTerm.Length != 0 && AppLogic.AppConfigBool("Search_LogSearches"))
             {
                 DB.ExecuteSQL("insert into SearchLog(SearchTerm,CustomerID,LocaleSetting) values(" + DB.SQuote(CommonLogic.Ellipses(searchTerm, 97, true)) + "," + ThisCustomer.CustomerID.ToString() + "," + DB.SQuote(ThisCustomer.LocaleSetting) + ")");
             }
@@ -63,6 +62,5 @@ namespace AspDotNetStorefront
 
             litSearch.Text = searchHTML;
         }
-        
     }
 }

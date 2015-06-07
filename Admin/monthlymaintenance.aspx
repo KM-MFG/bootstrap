@@ -224,6 +224,18 @@
 			<div class="row form-group">
 				<div class="col-sm-6">
 					<label>
+						<asp:Literal runat="server" Text="<%$Tokens:StringResource, admin.monthlymaintenance.UpdateStatistics %>" />:</label>
+				</div>
+				<div class="col-sm-6">
+					<asp:CheckBox ID="UpdateStatistics" runat="server" Checked="True" />
+					<asp:Label runat="server" CssClass="hover-help" data-toggle="tooltip" ToolTip="<%$Tokens:StringResource, admin.monthlymaintenance.tooltip.imgUpdateStats %>">
+						<i class="fa fa-question-circle fa-lg"></i>
+					</asp:Label>
+				</div>
+			</div>
+			<div class="row form-group">
+				<div class="col-sm-6">
+					<label>
 						<asp:Literal runat="server" Text="<%$Tokens:StringResource, admin.monthlymaintenance.CleanupLocalizationData %>" />:</label>
 				</div>
 				<div class="col-sm-6">

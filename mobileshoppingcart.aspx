@@ -266,14 +266,4 @@
                 </li>
             </asp:PlaceHolder>
         </ul>
-        <script type="text/javascript">
-
-            $(document).ready(function () {
-                var themeType = '<%= AspDotNetStorefrontCore.AppLogic.AppConfig("Mobile.Action.ThemeId") %>';
-                var divClasses = 'ui-btn ui-btn-corner-all ui-shadow ui-btn-up-c ui-btn-up-' + themeType;
-                $('.mpPayPalExpressSpan div').removeClass(divClasses);
-                $('.mpPayPalExpressSpan span').removeClass('ui-btn-inner ui-btn-corner-all');
-                $('.mpBtnPayPalExpressCheckout').removeClass('ui-btn-hidden');
-            });
-        </script>
 </asp:Content>

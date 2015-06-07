@@ -171,7 +171,7 @@ function formatAmex(ccNumber)
     for (var i = 0; i < localCCNumber.length; i++)
     {
         finalNumber = finalNumber.concat(localCCNumber[i]);
-        if (i == 3 || i == 10)
+        if (i == 3 || i == 9)
         {
             finalNumber = finalNumber.concat('-');
         }

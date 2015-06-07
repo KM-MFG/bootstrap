@@ -50,7 +50,7 @@ namespace AspDotNetStorefrontControls.Listing
 						selectedValueParameterName,
 						Fields.Aggregate(
 							String.Empty,
-							(a, field) => String.Format("{0} or {1} like '%' + @{2} + '%'", a, field, selectedValueParameterName))),
+							(a, field) => String.Format("{0} or charindex(@{2}, {1}) > 0", a, field, selectedValueParameterName))),
 				new[] { new ControlParameter(selectedValueParameterName, System.Data.DbType.String, Value.UniqueID, "Text") });
 		}
 	}

@@ -116,19 +116,23 @@
 
 			<aspdnsf:VariantEntityFilter runat="server"
 				Label="<%$Tokens:StringResource, admin.common.Category %>"
-				EntityType="Category" />
+				EntityType="Category"
+				VariantIdColumnName="v.VariantId" />
 
 			<aspdnsf:VariantEntityFilter runat="server"
 				Label="<%$Tokens:StringResource, admin.common.Manufacturer %>"
-				EntityType="Manufacturer" />
+				EntityType="Manufacturer"
+				VariantIdColumnName="v.VariantId" />
 
 			<aspdnsf:VariantEntityFilter runat="server"
 				Label="<%$Tokens:StringResource, admin.common.Section %>"
-				EntityType="Section" />
+				EntityType="Section"
+				VariantIdColumnName="v.VariantId" />
 
 			<aspdnsf:VariantEntityFilter runat="server"
 				Label="<%$Tokens:StringResource, admin.common.Distributor %>"
-				EntityType="Distributor" />
+				EntityType="Distributor" 
+				VariantIdColumnName="v.VariantId" />
 
 			<aspdnsf:BooleanFilter runat="server"
 				Label="<%$Tokens:StringResource, admin.common.Published%>"

@@ -3,10 +3,17 @@
 
 <asp:Content runat="server" ContentPlaceHolderID="bodyContentPlaceholder">    
     <div id="container">
-		<h1>
-			<i class="fa fa-info-circle"></i>
-			<asp:Label ID="lblHeader" runat="server" Text="<%$Tokens:StringResource, admin.title.about %>" />
-		</h1>
+		<div class="row admin-row">
+			<div class="col-sm-6">
+				<h1>
+					<i class="fa fa-info-circle"></i>
+					<asp:Label ID="lblHeader" runat="server" Text="<%$Tokens:StringResource, admin.title.about %>" />
+				</h1>
+			</div>
+			<div class="col-sm-6 expandingLabel">
+				<div><a href="http://www.aspdotnetstorefront.com/linkmanager.aspx?topic=9510eula&type=licensing" target="_blank">End User License Agreement</a></div>
+			</div>
+		</div>
 		<div class="white-ui-box">
 			<div class="white-box-heading">
 				<asp:Label runat="server" Text="<%$Tokens:StringResource, admin.default.SecurityAudit %>" />

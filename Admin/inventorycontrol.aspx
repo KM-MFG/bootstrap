@@ -1,7 +1,7 @@
 <%@ Page Language="C#" AutoEventWireup="true" CodeFile="inventorycontrol.aspx.cs" Inherits="AspDotNetStorefrontAdmin._InventoryControl" MaintainScrollPositionOnPostback="true" MasterPageFile="~/App_Templates/Admin_Default/AdminMaster.master" %>
-
 <%@ Register Assembly="AjaxControlToolkit" Namespace="AjaxControlToolkit" TagPrefix="AjaxToolkit" %>
 <%@ Register TagPrefix="aspdnsf" TagName="AppConfigInfo" Src="controls/appconfiginfo.ascx" %>
+
 <asp:Content runat="server" ContentPlaceHolderID="bodyContentPlaceholder">
 	<h1>
 		<i class="fa fa-tasks"></i>
@@ -13,11 +13,13 @@
 	<div class="item-action-bar">
 		<asp:Button ID="btnUpdateTop" runat="server" OnClick="btnUpdate_Click" CssClass="btn btn-primary" Text="<%$Tokens:StringResource, admin.common.Save %>" />
 	</div>
-	<asp:Panel ID="pnlLocale" runat="server">
+	<asp:Panel runat="server">
 		<div class="item-action-bar">
 			<div class="other-actions">
-				<asp:Label AssociatedControlID="ddlLocale" runat="server" Text="<%$Tokens:StringResource, admin.common.Locale %>" />
-				<asp:DropDownList ID="ddlLocale" runat="server" AutoPostBack="true" OnSelectedIndexChanged="ddlLocale_SelectedIndexChanged" />
+				<asp:Panel runat="server" Visible='<%# LocaleSelector.HasMultipleLocales() %>'>
+					<asp:Label runat="server" Text="<%$Tokens:StringResource, admin.stringresources.Locale %>" AssociatedControlID="LocaleSelector" />
+					<aspdnsf:LocaleSelector ID="LocaleSelector" runat="server" OnSelectedLocaleChanged="LocaleSelector_SelectedLocaleChanged" />
+				</asp:Panel>
 			</div>
 		</div>
 	</asp:Panel>

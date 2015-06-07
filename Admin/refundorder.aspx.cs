@@ -13,88 +13,47 @@ namespace AspDotNetStorefrontAdmin
 {
 	public partial class refundorder : AdminPageBase
 	{
+		protected Order Order { get; set; }
 
-		#region PROPERTIES
-
-		public int OrderNumber { get; set; }
-
-		#endregion
-
-		#region PAGE EVENTS
-
-		/// <summary>
-		/// Page Load
-		/// </summary>
-		/// <param name="sender"></param>
-		/// <param name="e"></param>
 		protected void Page_Load(object sender, EventArgs e)
 		{
-			Response.CacheControl = "private";
-			Response.Expires = 0;
-			Response.AddHeader("pragma", "no-cache");
+			Order = new Order(CommonLogic.QueryStringUSInt("OrderNumber"), ThisCustomer.LocaleSetting);
 
-			btnCancel.Text = AppLogic.GetString("admin.common.cancel", ThisCustomer.LocaleSetting);
-			if(ThisCustomer.IsAdminUser)
-			{
-				divAllowed.Visible = true;
-				OrderNumber = CommonLogic.QueryStringUSInt("OrderNumber");
-				Order order = new Order(OrderNumber, ThisCustomer.LocaleSetting);
-				if(order.OrderNumber > 0)
-				{
-					divHasOrderNumber.Visible = true;
-					divIncorrectOrderNumber.Visible = false;
-					lblOrderNumber.Text = order.OrderNumber.ToString();
-
-					if(CommonLogic.FormCanBeDangerousContent("IsSubmit") == "true")
-					{
-						ProcessRefund(order);
-					}
-					else
-					{
-						refundForm.Visible = true;
-						btnSubmit.Visible = true;
-					}
-				}
-				else
-				{
-					divHasOrderNumber.Visible = false;
-					divIncorrectOrderNumber.Visible = true;
-					ctrlAlertMessageIncorrectOrderNumber.PushAlertMessage(AppLogic.GetString("admin.refund.InvalidOrderNumber", SkinID, LocaleSetting), AlertMessage.AlertType.Error);
-				}
-			}
-			else
-			{
-				divAllowed.Visible = false;
-				ctrlAlertMessageNoPermissions.PushAlertMessage(AppLogic.GetString("admin.refund.PermissionDenied", SkinID, LocaleSetting), AlertMessage.AlertType.Warning);
-			}
-		}
-
-		#endregion
-
-		#region PROCESS REFUNDS
-
-		/// <summary>
-		/// If the form is submitted, the refund will process, otherwise show message
-		/// </summary>
-		/// <param name="currentOrder"></param>
-		private void ProcessRefund(Order currentOrder)
-		{
-			btnSubmit.Visible = false;
-			refundForm.Visible = false;
-			string RefundReason = CommonLogic.FormCanBeDangerousContent("RefundReason");
-			string Status = Gateway.OrderManagement_DoFullRefund(currentOrder, ThisCustomer.LocaleSetting, RefundReason);
-
-			if(Status == AppLogic.ro_OK)
-			{
+			if(Order.IsEmpty)
+				ctrlAlertMessage.PushAlertMessage(AppLogic.GetString("admin.refund.InvalidOrderNumber", SkinID, LocaleSetting), AlertMessage.AlertType.Error);
+			else if(IsOrderRefunded(Order))
 				ctrlAlertMessage.PushAlertMessage(AppLogic.GetString("admin.refund.OrderWasRefunded", SkinID, LocaleSetting), AlertMessage.AlertType.Success);
-				btnCancel.Text = AppLogic.GetString("admin.common.close", ThisCustomer.LocaleSetting);
-			}
-			else
-			{
-				ctrlAlertMessage.PushAlertMessage(AppLogic.GetString(Status, SkinID, LocaleSetting), AlertMessage.AlertType.Info);
-			}
+
+			DataBind();
 		}
 
-		#endregion
+		protected void btnRefund_Click(object sender, EventArgs e)
+		{
+			var result = ProcessRefund(
+				order: Order,
+				reason: txtReason.Text,
+				forceRefund: CommonLogic.QueryStringBool("Force"),
+				localeSetting: LocaleSetting);
+
+			if(result == AppLogic.ro_OK)
+				ctrlAlertMessage.PushAlertMessage(AppLogic.GetString("admin.refund.OrderWasRefunded", SkinID, LocaleSetting), AlertMessage.AlertType.Success);
+			else
+				ctrlAlertMessage.PushAlertMessage(AppLogic.GetString(result, SkinID, LocaleSetting), AlertMessage.AlertType.Info);
+
+			Order = new Order(CommonLogic.QueryStringUSInt("OrderNumber"), ThisCustomer.LocaleSetting);
+			DataBind();
+		}
+
+		protected bool IsOrderRefunded(Order order)
+		{
+			return Order.TransactionState == AspDotNetStorefrontCore.AppLogic.ro_TXStateRefunded || Order.RefundedOn != DateTime.MinValue;
+		}
+
+		string ProcessRefund(Order order, string reason, bool forceRefund, string localeSetting)
+		{
+			return forceRefund
+				? Gateway.OrderManagement_DoForceFullRefund(order, localeSetting)
+				: Gateway.OrderManagement_DoFullRefund(order, localeSetting, reason);
+		}
 	}
 }

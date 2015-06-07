@@ -25,11 +25,11 @@ namespace AspDotNetStorefrontControls
 			if(searchTerm.Length > 0)
 				Page.ClientScript.RegisterStartupScript(GetType(),
 					"openwindow",
-					String.Format("<script type=text/javascript> window.open('http://help.aspdotnetstorefront.com/manual/95/default.aspx?pageid=_search_&searchtext={0}'); </script>", searchTerm));
+					String.Format("<script type=text/javascript> window.open('http://help.aspdotnetstorefront.com/manual/951/default.aspx?pageid=_search_&searchtext={0}'); </script>", searchTerm));
 			else
 				Page.ClientScript.RegisterStartupScript(GetType(),
 					"openwindow",
-					"<script type=text/javascript> window.open('http://help.aspdotnetstorefront.com/manual/95/default.aspx?pageid=welcome'); </script>");
+					"<script type=text/javascript> window.open('http://help.aspdotnetstorefront.com/manual/951/default.aspx?pageid=welcome'); </script>");
 
 			txtManualSearch.Text = string.Empty;
         }

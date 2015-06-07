@@ -4,25 +4,17 @@
 // For details on this license please visit the product homepage at the URL above.
 // THE ABOVE NOTICE MUST REMAIN INTACT. 
 // --------------------------------------------------------------------------------
-using AspDotNetStorefrontControls;
-using AspDotNetStorefrontCore;
 using System;
-using System.Data;
 using System.Data.SqlClient;
 using System.Threading;
-using System.Web;
-using System.Web.UI.WebControls;
+using AspDotNetStorefrontControls;
+using AspDotNetStorefrontCore;
 
 namespace AspDotNetStorefrontAdmin
 {
 	public partial class NewsEditor : AdminPageBase
 	{
 		readonly bool UseHtmlEditor;
-
-		string SelectedLocale
-		{
-			get { return !string.IsNullOrWhiteSpace(ddLocales.SelectedValue) ? ddLocales.SelectedValue : Localization.GetDefaultLocale(); }
-		}
 
 		int RecordId
 		{
@@ -37,37 +29,38 @@ namespace AspDotNetStorefrontAdmin
 
 		protected void Page_Load(object sender, EventArgs e)
 		{
-			Response.CacheControl = "private";
-			Response.Expires = 0;
-			Response.AddHeader("pragma", "no-cache");
+			txtCopy.Visible = !UseHtmlEditor;
+			radCopy.Visible = UseHtmlEditor;
 
 			if(Page.IsPostBack)
 				return;
 
 			txtDate.Culture = Thread.CurrentThread.CurrentUICulture;
-
-			LoadLocales();
-			LoadForm(RecordId);
+			LoadNewsItem();
 		}
 
 		protected override void OnPreRender(EventArgs e)
 		{
 			base.OnPreRender(e);
-
+			DataBind();
 			btnClose.DataBind();
 			btnCloseTop.DataBind();
 		}
 
-		protected void ddLocales_SelectedIndexChanged(object sender, EventArgs e)
+		protected void LocaleSelector_SelectedLocaleChanged(object sender, EventArgs e)
 		{
-			LoadForm(RecordId);
+			LoadNewsItem();
 		}
 
 		protected void btnSubmit_Click(object sender, EventArgs e)
 		{
 			try
 			{
-				RecordId = SaveForm(RecordId);
+				Page.Validate();
+				if(!Page.IsValid)
+					return;
+
+				SaveNewsItem();
 				ctlAlertMessage.PushAlertMessage("admin.orderdetails.UpdateSuccessful".StringResource(), AlertMessage.AlertType.Success);
 			}
 			catch(Exception exception)
@@ -75,17 +68,17 @@ namespace AspDotNetStorefrontAdmin
 				ctlAlertMessage.PushAlertMessage(exception.Message, AlertMessage.AlertType.Error);
 			}
 		}
-		
+
 		protected void btnSaveAndClose_Click(object sender, EventArgs e)
 		{
 			try
 			{
-                if (Page.IsValid)
-                {
-                    SaveForm(RecordId);
-                    Response.Redirect(ReturnUrlTracker.GetReturnUrl(), false);
-                    return;
-                }				
+				Page.Validate();
+				if(!Page.IsValid)
+					return;
+
+				SaveNewsItem();
+				Response.Redirect(ReturnUrlTracker.GetReturnUrl(), false);
 			}
 			catch(Exception exception)
 			{
@@ -93,146 +86,88 @@ namespace AspDotNetStorefrontAdmin
 			}
 		}
 
-		void LoadForm(int recordId)
+		void LoadNewsItem()
 		{
-			var isNewRecord = recordId != 0;
-			if(!isNewRecord)
+			if(RecordId == 0)
 			{
 				Title = HeaderText.Text = AppLogic.GetString("admin.editnews.AddingNews", ThisCustomer.LocaleSetting);
-
-				if(!UseHtmlEditor)
-				{
-					txtCopy.Visible = true;
-					radCopy.Visible = false;
-				}
-
-				txtDate.SelectedDate = System.DateTime.Now.AddMonths(1);
+				txtDate.SelectedDate = DateTime.Now.AddMonths(1);
 			}
 			else
 			{
 				Title = HeaderText.Text = AppLogic.GetString("admin.editnews.EditingNews", ThisCustomer.LocaleSetting);
 
-				var query = "SELECT * FROM News WITH (NOLOCK) WHERE NewsID = @NewsID";
-				var parameters = new []
+				using(var connection = new SqlConnection(DB.GetDBConn()))
+				using(var command = new SqlCommand())
 				{
-					new SqlParameter("@NewsID", recordId.ToString()) 
-				};
+					command.Connection = connection;
+					command.CommandText = "SELECT * FROM News WITH (NOLOCK) WHERE NewsID = @NewsID";
+					command.Parameters.AddRange(new[]
+						{
+							new SqlParameter("@NewsID", RecordId.ToString()) 
+						});
 
-				using(var connection = DB.dbConn())
-				{
 					connection.Open();
-					using(var reader = DB.GetRS(query, parameters, connection))
-					{
+					using(var reader = command.ExecuteReader())
 						if(reader.Read())
 						{
-							litNewsId.Text = recordId.ToString();
-							txtHeadline.Text = DB.RSFieldByLocale(reader, "Headline", SelectedLocale);
+							var selectedLocale = LocaleSelector.GetSelectedLocale().Name;
+
+							litNewsId.Text = reader.FieldInt("NewsID").ToString();
+							txtHeadline.Text = reader.FieldByLocale("Headline", selectedLocale);
 
 							if(UseHtmlEditor)
-							{
-								radCopy.Content = DB.RSFieldByLocale(reader, "NewsCopy", SelectedLocale);
-							}
+								radCopy.Content = reader.FieldByLocale("NewsCopy", selectedLocale);
 							else
-							{
-								txtCopy.Visible = true;
-								radCopy.Visible = false;
-								txtCopy.Text = DB.RSFieldByLocale(reader, "NewsCopy", SelectedLocale);
-							}
+								txtCopy.Text = reader.FieldByLocale("NewsCopy", selectedLocale);
 
-							txtDate.SelectedDate = DB.RSFieldDateTime(reader, "ExpiresOn");
-							cbxPublished.Checked = DB.RSFieldBool(reader, "Published");
+							txtDate.SelectedDate = reader.FieldDateTime("ExpiresOn");
+							cbxPublished.Checked = reader.FieldBool("Published");
 						}
-					}
 				}
 			}
 
-			StoresMapping.ObjectID = recordId;
+			StoresMapping.ObjectID = RecordId;
 			StoresMapping.DataBind();
-
-			if(StoresMapping.StoreCount > 1)
-				divStoreMapping.Visible = true;
+			divStoreMapping.Visible = StoresMapping.StoreCount > 1;
 		}
 
-		int SaveForm(int recordId)
+		void SaveNewsItem()
 		{
-			var editing = recordId != 0;
-			var published = cbxPublished.Checked;
-
-			var expirationDate = (DateTime)txtDate.SelectedDate;
-
-			if(expirationDate == System.DateTime.MinValue)
-				expirationDate = System.DateTime.Now.AddMonths(1);
-
+			var editing = RecordId != 0;
+			var selectedLocale = LocaleSelector.GetSelectedLocale().Name;
+			var expirationDate = txtDate.SelectedDate ?? System.DateTime.Now.AddMonths(1);
 			var headline = editing
-				? AppLogic.FormLocaleXml("Headline", txtHeadline.Text.Trim(), SelectedLocale, "news", recordId)
-                : AppLogic.FormLocaleXml(txtHeadline.Text.Trim(), SelectedLocale);
+				? AppLogic.FormLocaleXml("Headline", txtHeadline.Text.Trim(), selectedLocale, "News", RecordId)
+				: AppLogic.FormLocaleXml(txtHeadline.Text.Trim(), selectedLocale);
 
-			var copy = String.Empty;
-			if(editing)
-				copy = UseHtmlEditor
-					? AppLogic.FormLocaleXml("NewsCopy", radCopy.Content, SelectedLocale, "news", recordId)
-					: AppLogic.FormLocaleXmlEditor("NewsCopy", "NewsCopy", SelectedLocale, "news", recordId);
-			else
-				copy = UseHtmlEditor
-					? AppLogic.FormLocaleXml(radCopy.Content, SelectedLocale)
-					: AppLogic.FormLocaleXmlEditor("NewsCopy", "NewsCopy", SelectedLocale, "news", recordId);
+			var copyContent = UseHtmlEditor
+				? radCopy.Content
+				: txtCopy.Text;
 
-			var identityParam = new SqlParameter
-			{
-				ParameterName = "identity",
-				Direction = ParameterDirection.Output
-			};
+			var copy = editing
+				? AppLogic.FormLocaleXml("NewsCopy", copyContent, selectedLocale, "News", RecordId)
+				: AppLogic.FormLocaleXml(copyContent, selectedLocale);
 
 			var parameters = new[]
-			{
-				new SqlParameter("@NewsID", recordId),
-				new SqlParameter("@Headline", headline),
-				new SqlParameter("@Copy", copy),
-				new SqlParameter("@ExpirationDate", expirationDate),
-				new SqlParameter("@Published", published)
-			};
+				{
+					new SqlParameter("@newsId", RecordId),
+					new SqlParameter("@headline", headline),
+					new SqlParameter("@copy", copy),
+					new SqlParameter("@expirationDate", expirationDate),
+					new SqlParameter("@published", cbxPublished.Checked)
+				};
 
 			var query = editing
-				? "UPDATE News SET Headline = @Headline, NewsCopy = @Copy, Published = @Published, ExpiresOn = @ExpirationDate WHERE NewsID = @NewsID"
-				: "INSERT INTO News (Headline, NewsCopy, Published, ExpiresOn) VALUES (@Headline, @Copy, @Published, @ExpirationDate); select cast(SCOPE_IDENTITY() as int) N;";
+				? "UPDATE News SET Headline = @headline, NewsCopy = @copy, Published = @published, ExpiresOn = @expirationDate WHERE NewsID = @newsID"
+				: "INSERT News (Headline, NewsCopy, Published, ExpiresOn) VALUES (@headline, @copy, @published, @expirationDate); select cast(SCOPE_IDENTITY() as int) N;";
 
 			var identity = DB.GetSqlN(query, parameters);
 			if(!editing)
-				recordId = identity;
+				RecordId = identity;
 
-			StoresMapping.ObjectID = recordId;
+			StoresMapping.ObjectID = RecordId;
 			StoresMapping.Save();
-
-			return recordId;
 		}
-
-		void LoadLocales()
-		{
-			ddLocales.Items.Clear();
-
-			try
-			{
-				var localeCount = DB.GetSqlN("select count(Name) as N from LocaleSetting with (NOLOCK)");
-				if(localeCount > 1)
-					pnlLocale.Visible = true;
-
-				using(SqlConnection conn = new SqlConnection(DB.GetDBConn()))
-				{
-					conn.Open();
-					using(IDataReader localeReader = DB.GetRS("SELECT Name, Description FROM LocaleSetting  with (NOLOCK)  ORDER BY DisplayOrder,Name", conn))
-					{
-						while(localeReader.Read())
-						{
-							ddLocales.Items.Add(new ListItem(DB.RSField(localeReader, "Description"), DB.RSField(localeReader, "Name")));
-						}
-					}
-				}
-			}
-			catch(Exception ex)
-			{
-				ctlAlertMessage.PushAlertMessage(ex.ToString(), AspDotNetStorefrontControls.AlertMessage.AlertType.Error);
-			}
-		}
-
 	}
 }

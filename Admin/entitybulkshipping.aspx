@@ -1,14 +1,14 @@
-<%@ Page language="c#" Inherits="AspDotNetStorefrontAdmin.entityBulkShipping" CodeFile="entitybulkshipping.aspx.cs" MasterPageFile="~/App_Templates/Admin_Default/Popup.master" Theme="Admin_Default" %>
+<%@ Page Language="c#" Inherits="AspDotNetStorefrontAdmin.entityBulkShipping" CodeFile="entitybulkshipping.aspx.cs" MasterPageFile="~/App_Templates/Admin_Default/Popup.master" Theme="Admin_Default" %>
 
 <asp:Content runat="server" ContentPlaceHolderID="bodyContentPlaceholder">
-		<aspdnsf:AlertMessage runat="server" ID="AlertMessageDisplay" />
-		<asp:Panel runat="server" ID="MainBody" DefaultButton="btnSubmit">
-			<div class="item-action-bar">
-				<asp:Button runat="server" ID="btnSubmit" CssClass="btn btn-primary btn-sm" Text="<%$Tokens:StringResource, admin.entityBulkShipping.ShippingUpdate %>" />
-			</div>
-			<asp:Literal ID="ltBody" runat="server" />
-			<div class="item-action-bar">
-				<asp:Button runat="server" ID="btnSubmitBottom" CssClass="btn btn-primary btn-sm" Text="<%$Tokens:StringResource, admin.entityBulkShipping.ShippingUpdate %>" />
-			</div>
-		</asp:Panel>
+	<aspdnsf:AlertMessage runat="server" ID="AlertMessageDisplay" />
+	<asp:Panel runat="server" ID="MainBody" DefaultButton="btnSubmit">
+		<div class="item-action-bar">
+			<asp:Button runat="server" ID="btnSubmit" CssClass="btn btn-primary btn-sm" Text="<%$Tokens:StringResource, admin.entityBulkShipping.ShippingUpdate %>" />
+		</div>
+		<asp:Literal ID="ltBody" runat="server" />
+		<div class="item-action-bar">
+			<asp:Button runat="server" CssClass="btn btn-primary btn-sm" Text="<%$Tokens:StringResource, admin.entityBulkShipping.ShippingUpdate %>" />
+		</div>
+	</asp:Panel>
 </asp:Content>

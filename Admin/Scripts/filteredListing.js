@@ -1,4 +1,4 @@
-﻿var FilteredListing = (function($) {
+var FilteredListing = (function($) {
 
 	var config = {
 		filtering: {
@@ -128,46 +128,53 @@
 		function initializeFilterButtons() {
 			$submitButton.click(function(e) {
 				// Add/update the filter params in the query string
-				applyFiltersToQueryString(function(queryString, filterName, filterApplyEmptyValue, filterElement) {
-					var filterValue = filterElement.is(':checkbox')
-						? filterElement.is(':checked')
-						: filterElement.val();
+				setQueryStringValuesForFilters(function(filter) {
+					var filterValue = filter.element.is(':checkbox')
+						? filter.element.is(':checked')
+						: filter.element.val();
 
-					if(filterValue !== '' || filterValue === true || filterApplyEmptyValue) {
-						// We have a couple hacks to work around quirks in the query string library
-						var stringifiedValue = filterValue.toString();		// Force to a string so boolean false is not removed by the query string library.
-						var encodedValue = encodeURI(stringifiedValue).replace(/%20/g, ' ');	// Remove escaped strings because they get handled specially by the query string library.
-						console.log(filterValue, stringifiedValue, encodedValue);
-
-						return queryString.set(filterName, encodedValue);
-					}
+					if(filterValue !== '' || filterValue === true || filter.applyEmptyValue)
+						// Force to a string so boolean false is not removed by the query string library.
+						return filterValue.toString();
 					else
-						return queryString.remove(filterName);
+						// Remove the filter param from the query string by return no value for it
+						return null;
 				});
 
 				return false;
 			});
 
 			$resetButton.click(function(e) {
-				// Remove the filter params from the query string
-				applyFiltersToQueryString(function(queryString, filterName, filterApplyEmptyValue, filterElement) {
-					return queryString.remove(filterName);
+				setQueryStringValuesForFilters(function(filter) {
+					// Remove the filter param from the query string by return no value for it
+					return null;
 				});
 
 				return false;
 			});
 
-			function applyFiltersToQueryString(action) {
+			function setQueryStringValuesForFilters(filterValueCallback) {
 				var queryString = $.query;
 
 				$filterContainer.find('*:input:visible')
 					.each(function() {
 						var element = $(this);
-						var filterName = element.data(config.dataKey.name) || element.attr('name');
-						var filterApplyEmptyValue = element.data(config.dataKey.applyEmptyValue) === true;
 
-						if(filterName)
-							queryString = action(queryString, filterName, filterApplyEmptyValue, element);
+						var filterName = element.data(config.dataKey.name) || element.attr('name');
+						if(!filterName) 
+							return;
+
+						var filter = {
+							name: filterName,
+							element: element,
+							applyEmptyValue: element.data(config.dataKey.applyEmptyValue) === true
+						};
+
+						var result = filterValueCallback && filterValueCallback(filter);
+						if(result === undefined || result === null)
+							queryString = queryString.remove(filterName);
+						else
+							queryString = queryString.set(filterName, result);
 					});
 
 				location.search = queryString
@@ -313,7 +320,8 @@
 					// The sortExpression is escaped, so we have to parse the escaped characters.
 					// There has to be a better way than eval. Feel free to assume I'm an idiot and do the right thing here.
 					var sortExpressionData = eval('"' + sortExpression + '"');
-					element.data(config.dataKey.expression, sortExpressionData);
+					var encodedSortExpression = btoa(sortExpressionData);
+					element.data(config.dataKey.expression, encodedSortExpression);
 				}
 
 				// Clear hrefs
@@ -338,7 +346,7 @@
 						query = query.set(config.queryKey.direction, config.descending);
 				else
 					query = query
-						.set(config.queryKey.expression, sortExpression)
+						.set(config.queryKey.expression, encodeURI(sortExpression))
 						.set(config.queryKey.direction, config.ascending);
 
 				if(query.get(config.queryKey.direction) === defaultSortDirection)

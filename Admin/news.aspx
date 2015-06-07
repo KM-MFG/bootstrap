@@ -15,31 +15,44 @@
 
 	<aspdnsf:FilteredListing runat="server"
 		ID="FilteredListing"
-		SqlQuery="SELECT {0} News.NewsID, dbo.GetMlValue(News.Headline, @_locale) Headline, News.Published, News.CreatedOn FROM News WHERE Deleted = 0 AND {1}"
+		SqlQuery="
+			SELECT {0} 
+				News.NewsID, 
+				dbo.GetMlValue(News.Headline, @_locale) Headline, 
+				News.Published, 
+				News.CreatedOn 
+			FROM 
+				News 
+			WHERE 
+				Deleted = 0 
+				AND {1}"
 		SortExpression="News.NewsID"
 		LocaleSelectionEnabled="true">
 		<ActionBarTemplate>
 			<asp:HyperLink runat="server" CssClass="btn btn-action" Text="<%$Tokens:StringResource, admin.news.createNews %>" NavigateUrl="newseditor.aspx" />
 		</ActionBarTemplate>
 		<Filters>
-			<aspdnsf:StringFilter runat="server" Label="Headline" FieldName="Headline" />
-			<aspdnsf:StringFilter runat="server" Label="Copy" FieldName="NewsCopy" />
-			<aspdnsf:BooleanFilter runat="server" Label="Published" FieldName="Published" />
+			<aspdnsf:StringFilter runat="server"
+				Label="Headline"
+				FieldName="dbo.GetMlValue(News.Headline, @_locale)" />
+
+			<aspdnsf:StringFilter runat="server"
+				Label="Copy"
+				FieldName="dbo.GetMlValue(News.NewsCopy, @_locale)" />
+
+			<aspdnsf:BooleanFilter runat="server"
+				Label="Published"
+				FieldName="Published" />
 		</Filters>
 		<ListingTemplate>
 			<div class="white-ui-box">
-				<asp:GridView CssClass="table" ID="gMain" runat="server"
+				<asp:GridView runat="server"
+					ID="gMain"
+					CssClass="table"
 					DataSourceID="FilteredListingDataSource"
-					PagerSettings-Position="TopAndBottom"
 					AutoGenerateColumns="False"
-					OnRowDataBound="gMain_RowDataBound"
-					OnRowCommand="gMain_RowCommand"
-					BorderStyle="None"
-					BorderWidth="0px"
-					CellPadding="0"
-					GridLines="None"
-					CellSpacing="-1"
-					ShowFooter="True">
+					OnRowCommand="DispatchCommand"
+					GridLines="None">
 					<EmptyDataTemplate>
 						<div class="alert alert-info">
 							<asp:Literal runat="server" Text="<%$ Tokens:StringResource, admin.common.EmptyDataTemplate.NoResults %>" />
@@ -48,7 +61,7 @@
 					<Columns>
 						<asp:BoundField
 							HeaderText="ID"
-							ItemStyle-Width="5%"
+							HeaderStyle-Width="5%"
 							DataField="NewsID" />
 
 						<asp:HyperLinkField
@@ -60,12 +73,12 @@
 
 						<asp:BoundField
 							HeaderText="Created On"
-							ItemStyle-Width="15%"
+							HeaderStyle-Width="15%"
 							DataField="CreatedOn" />
 
 						<asp:TemplateField
-							HeaderText="<%$ Tokens: StringResource, admin.common.Published %>">
-							<HeaderStyle Width="8%" />
+							HeaderText="<%$ Tokens: StringResource, admin.common.Published %>"
+							HeaderStyle-Width="8%">
 							<ItemTemplate>
 								<aspdnsf:CommandCheckBox runat="server"
 									ToolTip='<%# (byte)DataBinder.Eval(Container.DataItem, "Published") == 1 ? "Unpublish News Article" : "Publish News Article" %>'
@@ -73,26 +86,27 @@
 									UncheckedCommandName="<%# UnpublishNewsCommand %>"
 									CommandArgument='<%# DataBinder.Eval(Container.DataItem, "NewsID") %>'
 									AutoPostBack="true"
-									OnCommand="DispatchCommand"
 									Checked='<%# (byte)DataBinder.Eval(Container.DataItem, "Published") == 1 %>' />
 							</ItemTemplate>
 						</asp:TemplateField>
 
-						<asp:TemplateField HeaderText="Delete">
+						<asp:TemplateField
+							HeaderText="Delete"
+							HeaderStyle-Width="5%">
 							<ItemTemplate>
-								<asp:LinkButton ID="lnkDelete" ToolTip="Delete" CssClass="delete-link" CommandName="DeleteItem" CommandArgument='<%# Eval("NewsID") %>' runat="Server">
-									<i class="fa fa-times"></i> <asp:Literal runat="server" Text="<%$Tokens:StringResource, admin.common.Delete %>" />
+								<asp:LinkButton runat="Server"
+									ID="lnkDelete"
+									CssClass="delete-link"
+									ToolTip="Delete"
+									OnClientClick="javascript: return confirm('Are you sure you want to delete this news article?')"
+									CommandName="<%# DeleteNewsCommand %>"
+									CommandArgument='<%# Eval("NewsID") %>'>
+									<i class="fa fa-times"></i>
+									<asp:Literal runat="server" Text="<%$Tokens:StringResource, admin.common.Delete %>" />
 								</asp:LinkButton>
 							</ItemTemplate>
-							<ItemStyle Width="5%" />
 						</asp:TemplateField>
 					</Columns>
-					<FooterStyle CssClass="gridFooter" />
-					<RowStyle CssClass="gridRow" />
-					<EditRowStyle CssClass="gridEdit2" />
-					<PagerStyle CssClass="tablepagerGrid" />
-					<HeaderStyle CssClass="gridHeader" />
-					<AlternatingRowStyle CssClass="gridAlternatingRow" BorderWidth="0px" />
 				</asp:GridView>
 			</div>
 		</ListingTemplate>
