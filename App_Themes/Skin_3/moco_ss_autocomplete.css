@@ -1,0 +1,129 @@
+﻿
+
+#srchCnt
+{
+	margin: 0 0 0 40px;
+}
+
+
+.lstCnt
+{
+	margin:0 0 5px 0;
+	list-style:none;
+}
+
+	
+#srchResContainer
+{
+	position:absolute;
+    width: 80%;
+	max-width:1000px;
+	min-height:180px;
+	border:1px solid #E2E2E2;
+	overflow:hidden;
+	padding:10px 20px 10px 20px;
+	background-color:White;
+	z-index:1000;
+	
+	-moz-box-shadow: 0 4px 8px rgba(0,0,0,0.5);
+	-webkit-box-shadow: 0 4px 8px rgba(0,0,0,0.5);
+	box-shadow: 0 4px 8px rgba(0,0,0,0.5);
+}
+	
+/*search list*/
+#srchRes
+{
+	float:right;
+	font-size:1.0em;
+	text-align:right;
+}
+
+/*individual search list items*/
+#srchRes li
+{
+	cursor:default;
+	margin:0 0 4px 10px;
+	list-style:none;
+}
+
+/*image container*/
+.imgcon
+{
+	display:inline-block;
+	text-align:center;
+}
+	
+/*images*/
+#imgs
+{
+	//float:right;
+}
+
+#brand
+{
+	position:absolute;
+	color:#D1CFCF;
+	float:right;
+	display:none;
+	font-size:1.2em;
+}
+
+.brandLnk, .brandLnk:visited, .brandLnk:link
+{
+	color:#D1CFCF;
+	font-size:.8em;
+}
+.brandLnk:hover
+{
+	color:#FF7F00;
+}
+	
+#imgs img
+{
+	display:inline;
+	margin:0 10px 0 0;
+	border: 1px solid #F7F7F7;
+}
+
+.imgPct
+{
+}
+
+.imgCpt
+{
+	text-align:center;
+	width:100px;
+	font-size:.7em;
+}
+
+.clr
+{
+	clear:both;
+}
+	
+.bld
+{
+	font-weight:bold;
+}
+
+
+.lstItmNormal
+{
+	color:Black;
+    padding-right: 10px;
+	//width:250px;
+}
+.lstItmOver
+{
+	color:#005BAA;
+	background-color:#eee;
+    padding:0 15px;
+	//width:250px;
+}
+
+.pressEnterToSearch
+{
+	font-size:.8em;
+	margin:10px 0 0 0;
+	font-style:italic;
+}
