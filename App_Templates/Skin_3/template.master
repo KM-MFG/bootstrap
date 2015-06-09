@@ -23,22 +23,28 @@
         <!-- Outdated Browser -->
             <link rel="stylesheet" href="/_Submodules/outdated-browser/outdatedbrowser/outdatedbrowser.min.css"/>
             <script src="/_Submodules/outdated-browser/outdatedbrowser/outdatedbrowser.min.js"></script>
+        <!-- End -->
     
         <!-- Ridiculously Responsive Social Sharing Buttons -->
             <link rel="stylesheet" href="/_Submodules/rrssb/css/rrssb.css"/>
             <link rel="stylesheet" href="/_Submodules/rrssb/css/normalize.min.css"/>
             <script type="text/javascript" src="/_Submodules/rrssb/js/rrssb.min.js"></script>
+        <!-- End -->
     <!-- End SUBMODULES -->
 
 	<%-- jQuery is required in versions 9.4 and higher --%>
-	<script src="jscripts/jquery.min.js" type="text/javascript"></script>
-	<script type="text/javascript">
-		adnsf$ = jQuery; <%-- to avoid conflicts with existing jQuery versions and other javascript frameworks, change this line to adnsf$ = jQuery.noConflict(); --%>
-	</script>
-	<script src="App_Templates/Skin_<asp:Literal runat='server' Text='<%$ Tokens:SkinId %>' />/js/bootstrap.min.js" type="text/javascript"></script>
+        <script src="//ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
+    	    <script type="text/javascript">
+		    adnsf$ = jQuery; <%-- to avoid conflicts with existing jQuery versions and other javascript frameworks, change this line to adnsf$ = jQuery.noConflict(); --%>
+	    </script>
+    <!-- End -->
+
+    <!-- Bootstrap -->
+	        <script src="App_Templates/Skin_<asp:Literal runat='server' Text='<%$ Tokens:SkinId %>' />/js/bootstrap.min.js" type="text/javascript"></script>
+    <!-- End -->
 
     <%-- Moco AutoComplete Script --%>
-    <script src="jscripts/moco_ss_autocompletes.js" type="text/javascript"></script>
+        <script src="jscripts/moco_ss_autocompletes.js" type="text/javascript"></script>
     <!-- End -->
 
 </head>
