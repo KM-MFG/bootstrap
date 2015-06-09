@@ -1,0 +1,12 @@
+[submodule "_Submodules/bootstrap"]
+	path = _Submodules/bootstrap
+	url = git@github.com:twbs/bootstrap.git
+[submodule "_Submodules/outdated-browser"]
+	path = _Submodules/outdated-browser
+	url = git@github.com:KM-MFG/outdated-browser.git
+[submodule "_Submodules/rrssb"]
+	path = _Submodules/rrssb
+	url = git@github.com:KM-MFG/rrssb.git
+[submodule "_Submodules/transformicons"]
+	path = _Submodules/transformicons
+	url = git@github.com:KM-MFG/transformicons.git
