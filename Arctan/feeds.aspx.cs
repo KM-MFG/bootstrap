@@ -9,6 +9,8 @@ using System.Data;
 using System.Data.SqlClient;
 using System.Configuration;
 using System.Collections;
+using System.IO;
+using System.Net;
 using System.Web;
 using System.Web.Security;
 using System.Web.UI;
@@ -97,5 +99,43 @@ namespace AspDotNetStorefrontAdmin
 
 			InitializePageData();
 		}
+
+		protected void SmartSearch_RebuildIndex_Click(object sender, EventArgs e)
+		{
+			// Create the web request
+			String action = "GenerateIndex";
+			String data = "true";
+			String url = String.Format("{0}{1}={2}", ConfigurationManager.AppSettings["SmartSearchURL"], action, data);
+
+			HttpWebRequest request = WebRequest.Create(url) as HttpWebRequest;
+			request.Timeout = 3600000;
+			string r = null;
+			// Get response
+			using(HttpWebResponse response = request.GetResponse() as HttpWebResponse)
+			{
+				// Get the response stream
+				StreamReader reader = new StreamReader(response.GetResponseStream());
+				r = reader.ReadToEnd();
+			}
+			
+			resetError(r, false);
+		}
+		
+		protected void resetError(string error, bool isError)
+        {
+            if (error.Length > 0)
+            {
+                if (isError)
+                {
+                    string errorMessage = String.Format("<font class=\"noticeMsg\">{0}</font>", "Error Occurred While Rebuilding Smart Search Index!");
+					AlertMessage.PushAlertMessage(errorMessage, AspDotNetStorefrontControls.AlertMessage.AlertType.Error);
+				}
+                else
+                {
+                    string successMessage = String.Format("<font class=\"noticeMsg\">{0}</font>", "Success! Smart Search Index Has Been Rebuilt");
+					AlertMessage.PushAlertMessage(successMessage, AspDotNetStorefrontControls.AlertMessage.AlertType.Success);
+				}
+            }
+        }
 	}
 }

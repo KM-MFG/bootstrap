@@ -19,12 +19,15 @@ using System.Collections.Generic;
 using AspDotNetStorefrontAdmin;
 using AspDotNetStorefrontCore;
 
+using EXT = Moco.AspDNSF.Extension;
+
 namespace AspDotNetStorefrontAdmin
 {
 	public partial class editfeed : AdminPageBase
 	{
 		int FeedID;
-		Feed m_Feed;
+		EXT.Feed m_Feed;
+		EXT.FeedManager m_FeedMgr = new EXT.FeedManager(DB.GetDBConn());
 		private List<Store> m_stores;
 		public List<Store> Stores
 		{
@@ -44,7 +47,7 @@ namespace AspDotNetStorefrontAdmin
 				FeedID = CommonLogic.QueryStringUSInt("feedid");
 
 			if(FeedID != 0)
-				m_Feed = new Feed(FeedID);
+				m_Feed = m_FeedMgr.LoadFeed(FeedID);
 
 			if(!IsPostBack)
 				InitializePageData();
@@ -100,6 +103,19 @@ namespace AspDotNetStorefrontAdmin
 
 				btnExecFeed_Top.Visible =
 					btnExecFeed_Bottom.Visible = true;
+					
+				RequiresClassification.Items[0].Selected = m_Feed.RequiresClassification;
+				RequiresClassification.Items[1].Selected = !m_Feed.RequiresClassification;
+				UseFtpFileNameDateStamp.Items[0].Selected = m_Feed.UseFTPFilenameDateStamp;
+				UseFtpFileNameDateStamp.Items[1].Selected = !m_Feed.UseFTPFilenameDateStamp;
+				FTPFilenameDateStampFormat.Text = m_Feed.FTPFilenameDateStampFormat.Trim();
+				UsePassive.Items[0].Selected = m_Feed.UsePassive;
+				UsePassive.Items[1].Selected = !m_Feed.UsePassive;
+				UseBinary.Items[0].Selected = m_Feed.UseBinary;
+				UseBinary.Items[1].Selected = !m_Feed.UseBinary;
+				UseSFTP.Items[0].Selected = m_Feed.UseSFTP;
+				UseSFTP.Items[1].Selected = !m_Feed.UseSFTP;
+				FTPFilenameDateStampFormatPreview.Text = (m_Feed.UseFTPFilenameDateStamp && !String.IsNullOrEmpty(m_Feed.FTPFilename)) ? "&nbsp;"+m_Feed.DestinationFileName() : String.Empty;
 			}
 			else
 			{
@@ -115,35 +131,48 @@ namespace AspDotNetStorefrontAdmin
 
 		protected void btnSubmit_OnClick(object sender, EventArgs e)
 		{
-			if(m_Feed != null)
+			Page.Validate();
+			if(Page.IsValid)
 			{
-				string result = UpdateFeed();
-				if(!String.IsNullOrWhiteSpace(result))
-					AlertMessage.PushAlertMessage(result, AspDotNetStorefrontControls.AlertMessage.AlertType.Error);
+				if(m_Feed != null)
+				{
+					string result = UpdateFeed();
+					if(!String.IsNullOrWhiteSpace(result))
+						AlertMessage.PushAlertMessage(result, AspDotNetStorefrontControls.AlertMessage.AlertType.Error);
+					else
+						AlertMessage.PushAlertMessage("Feed has been updated.", AspDotNetStorefrontControls.AlertMessage.AlertType.Success);
+				}
 				else
-					AlertMessage.PushAlertMessage("Feed has been updated.", AspDotNetStorefrontControls.AlertMessage.AlertType.Success);
+				{
+					String FTPPort = txtFtpPort.Text.Trim();
+					if(FTPPort.Length == 0)
+					{
+						FTPPort = "21";
+					}
+
+					m_Feed = m_FeedMgr.CreateFeed(txtFeedName.Text,
+						1,
+						XmlPackage.SelectedValue,
+						(CanAutoFtp.SelectedValue == "1"),
+						(RequiresClassification.SelectedValue == "1"),
+						txtFtpUserName.Text,
+						txtFtpPwd.Text,
+						txtFtpServer.Text,
+						Convert.ToInt32(FTPPort),
+						txtFtpFileName.Text,
+						(UseFtpFileNameDateStamp.SelectedValue == "1"),
+						FTPFilenameDateStampFormat.Text.Trim(),
+						(UsePassive.SelectedValue == "1"),
+						(UseBinary.SelectedValue == "1"),
+						(UseSFTP.SelectedValue == "1"),
+						"");
+
+					FeedID = m_Feed.FeedID;
+				}
 			}
 			else
 			{
-				String FTPPort = txtFtpPort.Text.Trim();
-				if(FTPPort.Length == 0)
-				{
-					FTPPort = "21";
-				}
-
-				m_Feed = Feed.CreateFeed(Convert.ToInt32(cboStore.SelectedValue),
-					txtFeedName.Text,
-					1,
-					XmlPackage.SelectedValue,
-					(CanAutoFtp.SelectedValue == "1"),
-					txtFtpUserName.Text,
-					txtFtpPwd.Text,
-					txtFtpServer.Text,
-					Convert.ToInt32(FTPPort),
-					txtFtpFileName.Text,
-					"");
-
-				FeedID = m_Feed.FeedID;
+				resetError("Errors occured " + CommonLogic.IIF(m_Feed == null, "creating", "updating") + " the feed", true);
 			}
 
 			InitializePageData();
@@ -171,9 +200,7 @@ namespace AspDotNetStorefrontAdmin
 				String RuntimeParams = String.Empty;
 				RuntimeParams += String.Format("SID={0}&", cboStore.SelectedValue);
 				UpdateFeed();
-				var result = m_Feed.ExecuteFeed(ThisCustomer, RuntimeParams);
-				if(!String.IsNullOrWhiteSpace(result))
-					AlertMessage.PushAlertMessage(result, AspDotNetStorefrontControls.AlertMessage.AlertType.Error);
+				resetError(EXT.FeedManagerExt.ExecuteFeed(m_Feed, ThisCustomer, RuntimeParams), false);
 			}
 
 			InitializePageData();
@@ -182,12 +209,32 @@ namespace AspDotNetStorefrontAdmin
 		private string UpdateFeed()
 		{
 			String FTPPort = txtFtpPort.Text.Trim();
+			String errorResponse = String.Empty;
 			if(FTPPort.Length == 0)
 			{
 				FTPPort = "21";
 			}
 
-			return m_Feed.UpdateFeed(Convert.ToInt32(cboStore.SelectedValue), txtFeedName.Text, -1, XmlPackage.SelectedValue, Convert.ToSByte(CanAutoFtp.SelectedValue), txtFtpUserName.Text, txtFtpPwd.Text, txtFtpServer.Text, Convert.ToInt32(FTPPort), txtFtpFileName.Text.Trim(), "");
+			//TODO - Add support for StoreID: Convert.ToInt32(cboStore.SelectedValue),
+			errorResponse = m_FeedMgr.UpdateFeed(txtFeedName.Text,
+                                   -1,
+                                   XmlPackage.SelectedValue,
+                                   Convert.ToSByte(CanAutoFtp.SelectedValue),
+								   Convert.ToSByte(RequiresClassification.SelectedValue),
+                                   txtFtpUserName.Text,
+                                   txtFtpPwd.Text,
+                                   txtFtpServer.Text,
+                                   Convert.ToInt32(FTPPort),
+                                   txtFtpFileName.Text.Trim(),
+								   Convert.ToSByte(UseFtpFileNameDateStamp.SelectedValue),
+								   FTPFilenameDateStampFormat.Text.Trim(),
+								   Convert.ToSByte(UsePassive.SelectedValue),
+								   Convert.ToSByte(UseBinary.SelectedValue),
+								   Convert.ToSByte(UseSFTP.SelectedValue),
+								   "", 
+								   m_Feed);
+			m_Feed = m_FeedMgr.LoadFeed(m_Feed.FeedID);
+			return errorResponse;
 		}
 
 		protected void ValidateXmlPackage(object source, ServerValidateEventArgs args)
@@ -224,5 +271,22 @@ namespace AspDotNetStorefrontAdmin
 				args.IsValid = true;
 			}
 		}
+		
+		protected void resetError(string message, bool isError)
+        {
+            if (message.Length > 0)
+            {
+                if (isError)
+                {
+                    string errorMessage = String.Format("<font class=\"noticeMsg\">{0}</font>", message);
+					AlertMessage.PushAlertMessage(errorMessage, AspDotNetStorefrontControls.AlertMessage.AlertType.Error);
+				}
+                else
+                {
+                    string successMessage = String.Format("<font class=\"noticeMsg\">{0}</font>", message);
+					AlertMessage.PushAlertMessage(successMessage, AspDotNetStorefrontControls.AlertMessage.AlertType.Success);
+				}
+            }
+        }
 	}
 }

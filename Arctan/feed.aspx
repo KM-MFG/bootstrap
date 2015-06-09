@@ -55,8 +55,19 @@
 				</td>
 				<td>
 					<asp:RadioButtonList ID="CanAutoFtp" runat="server" RepeatDirection="Horizontal">
-						<asp:ListItem Text="Yes" Value="1" Selected="True"></asp:ListItem>
-						<asp:ListItem Text="No" Value="0"></asp:ListItem>
+						<asp:ListItem Text="Yes" Value="1"></asp:ListItem>
+						<asp:ListItem Text="No" Value="0" Selected="True"></asp:ListItem>
+					</asp:RadioButtonList>
+				</td>
+			</tr>
+			<tr>
+				<td>
+					<asp:Label runat="server" Text="<%$Tokens:StringResource, admin.editfeed.RequiresClassification %>" />
+				</td>
+				<td>
+					<asp:RadioButtonList ID="RequiresClassification" runat="server" RepeatDirection="Horizontal">
+						<asp:ListItem Text="Yes" Value="1"></asp:ListItem>
+						<asp:ListItem Text="No" Value="0" Selected="True"></asp:ListItem>
 					</asp:RadioButtonList>
 				</td>
 			</tr>
@@ -112,6 +123,62 @@
 					<asp:Label runat="server" CssClass="hover-help" data-toggle="tooltip" ToolTip="<%$Tokens:StringResource, admin.editfeed.tooltip.imgFtpFileName %>">
 						<i class="fa fa-question-circle fa-lg"></i>
 					</asp:Label>
+				</td>
+			</tr>
+			<tr>
+				<td>
+					<asp:Label runat="server" Text="<%$Tokens:StringResource, admin.editfeed.UseFtpFileNameDateStamp %>" />
+				</td>
+				<td>
+					<asp:RadioButtonList ID="UseFtpFileNameDateStamp" runat="server" RepeatDirection="Horizontal">
+						<asp:ListItem Text="Yes" Value="1"></asp:ListItem>
+						<asp:ListItem Text="No" Value="0" Selected="True"></asp:ListItem>
+					</asp:RadioButtonList>
+				</td>
+			</tr>
+			<tr>
+				<td>
+					<asp:Label runat="server" Text="<%$Tokens:StringResource, admin.editfeed.FTPFilenameDateStampFormat %>" />
+				</td>
+				<td>
+					<asp:TextBox ID="FTPFilenameDateStampFormat" runat="server" TextMode="SingleLine" />
+					<asp:Label runat="server" CssClass="hover-help" data-toggle="tooltip" ToolTip="<%$Tokens:StringResource, admin.editfeed.FTPFilenameDateStampFormat.tooltip %>">
+						<i class="fa fa-question-circle fa-lg"></i>
+					</asp:Label>
+					<asp:Literal ID="FTPFilenameDateStampFormatPreview" runat="server" />				
+				</td>
+			</tr>
+			<tr>
+				<td>
+					<asp:Label runat="server" Text="<%$Tokens:StringResource, admin.editfeed.UsePassive %>" />
+				</td>
+				<td>
+					<asp:RadioButtonList ID="UsePassive" runat="server" RepeatDirection="Horizontal">
+						<asp:ListItem Text="Yes" Value="1"></asp:ListItem>
+						<asp:ListItem Text="No" Value="0" Selected="True"></asp:ListItem>
+					</asp:RadioButtonList>
+				</td>
+			</tr>
+			<tr>
+				<td>
+					<asp:Label runat="server" Text="<%$Tokens:StringResource, admin.editfeed.UseBinary %>" />
+				</td>
+				<td>
+					<asp:RadioButtonList ID="UseBinary" runat="server" RepeatDirection="Horizontal">
+						<asp:ListItem Text="Yes" Value="1"></asp:ListItem>
+						<asp:ListItem Text="No" Value="0" Selected="True"></asp:ListItem>
+					</asp:RadioButtonList>
+				</td>
+			</tr>
+			<tr>
+				<td>
+					<asp:Label runat="server" Text="<%$Tokens:StringResource, admin.editfeed.UseSFTP %>" />
+				</td>
+				<td>
+					<asp:RadioButtonList ID="UseSFTP" runat="server" RepeatDirection="Horizontal">
+						<asp:ListItem Text="Yes" Value="1"></asp:ListItem>
+						<asp:ListItem Text="No" Value="0" Selected="True"></asp:ListItem>
+					</asp:RadioButtonList>
 				</td>
 			</tr>
 		</table>
