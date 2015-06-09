@@ -63,6 +63,7 @@
 						</td>
 						<td>
 							<asp:Button ID="btnDeleteFeed" runat="server" CssClass="btn btn-default btn-sm" Text="<%$Tokens:StringResource, admin.feeds.DeleteFeed %>" CommandArgument='<%# DataBinder.Eval(Container.DataItem, "FeedID") %>' CommandName='delete' />
+						    <asp:LinkButton OnClick="SmartSearch_RebuildIndex_Click" Visible='<%# (Convert.ToBoolean(DataBinder.Eval(Container.DataItem, "XmlPackage").ToString() == "feed.moco.smartsearch.xml.config")) %>' ID="SmartSearch_RebuildIndex" Text="ReIndex" runat="server" />
 						</td>
 					</tr>
 				</ItemTemplate>
